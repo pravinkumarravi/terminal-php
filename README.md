@@ -1,5 +1,7 @@
 # PHP Web Terminal
 
+![PHP Web Terminal](terminal-php.png)
+
 This project provides a simple, single-file web-based terminal built with PHP for the backend and Vue.js, Tailwind CSS, and vanilla JavaScript for the frontend. It allows you to execute shell commands directly from your web browser, with real-time output streaming.
 
 **⚠️ SECURITY WARNING:** This script allows arbitrary command execution on the server where it is hosted. **It is highly recommended to password-protect this file or delete it when not in active use to prevent unauthorized access and potential security breaches.**
