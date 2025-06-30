@@ -4,8 +4,8 @@
 
 This project provides two different web-based terminal implementations built with PHP for the backend:
 
-1. **terminal.php** - A feature-rich terminal using Vue.js, Tailwind CSS, and vanilla JavaScript
-2. **xterm-terminal.php** - A modern terminal using xterm.js for an authentic terminal experience
+1. **vue-terminal.php** - A feature-rich terminal using Vue.js, Tailwind CSS, and vanilla JavaScript
+2. **terminal.php** - A modern terminal using xterm.js for an authentic terminal experience
 
 Both terminals allow you to execute shell commands directly from your web browser with real-time output.
 
@@ -23,7 +23,7 @@ Both terminals allow you to execute shell commands directly from your web browse
 * **Single File:** Each terminal is contained within one PHP file for easy deployment
 * **Security Warning System:** Clear warnings about security implications
 
-### terminal.php (Vue.js Terminal)
+### vue-terminal.php (Vue.js Terminal)
 * **Modern Frontend Stack:** Vue.js for reactive UI and Tailwind CSS for styling
 * **Real-time Output Streaming:** See command output as it happens with spinner animation
 * **Built-in File Editor:** Nano-like text editor for editing files directly in the terminal
@@ -31,7 +31,7 @@ Both terminals allow you to execute shell commands directly from your web browse
 * **Linux-style Command Environment:** Ubuntu-like color coding for ls output
 * **Responsive Design:** Clean, modern interface that works on various screen sizes
 
-### xterm-terminal.php (Xterm.js Terminal)
+### terminal.php (Xterm.js Terminal)
 * **Authentic Terminal Experience:** Uses xterm.js for true terminal look and feel
 * **Full ANSI Color Support:** Complete support for terminal colors and escape sequences
 * **Native Terminal Features:** Proper cursor handling, scrollback buffer, and terminal emulation
@@ -50,15 +50,15 @@ Both terminals allow you to execute shell commands directly from your web browse
 
 ### Installation
 
-1. **Save the files:** Save either `terminal.php` or `xterm-terminal.php` (or both) in your web server's document root or a subfolder accessible via a web browser.
+1. **Save the files:** Save either `vue-terminal.php` or `terminal.php` (or both) in your web server's document root or a subfolder accessible via a web browser.
 2. **Access in Browser:** 
-   - For Vue.js terminal: Navigate to `http://localhost/terminal.php`
-   - For xterm.js terminal: Navigate to `http://localhost/xterm-terminal.php`
+   - For Vue.js terminal: Navigate to `http://localhost/vue-terminal.php`
+   - For xterm.js terminal: Navigate to `http://localhost/terminal.php`
 
 ### Which Terminal to Use?
 
-- **Choose `terminal.php`** if you want a modern, feature-rich interface with built-in file editing capabilities
-- **Choose `xterm-terminal.php`** if you prefer an authentic terminal experience with full ANSI support and native terminal feel
+- **Choose `vue-terminal.php`** if you want a modern, feature-rich interface with built-in file editing capabilities
+- **Choose `terminal.php`** if you prefer an authentic terminal experience with full ANSI support and native terminal feel
 
 ---
 
@@ -73,12 +73,12 @@ Both terminals allow you to execute shell commands directly from your web browse
 6. Use **Tab** for file/directory name completion
 7. Type `clear` to clear the terminal output
 
-### terminal.php Specific Features
+### vue-terminal.php Specific Features
 - **File Editor:** Type `nano filename.txt` to open the built-in editor
 - **Copy/Paste:** Right-click for context menu with copy/paste options
 - **Real-time Output:** Watch commands execute with live streaming output
 
-### xterm-terminal.php Specific Features
+### terminal.php Specific Features
 - **Terminal Shortcuts:** 
   - `Ctrl+C` to interrupt commands
   - `Ctrl+L` to clear screen
@@ -99,7 +99,7 @@ Both terminals intelligently combine PHP for server-side command execution with 
 * Provides tab completion suggestions via separate AJAX endpoints
 * Implements custom `ls` command with ANSI color support for xterm.js
 
-### terminal.php Frontend (Vue.js)
+### vue-terminal.php Frontend (Vue.js)
 
 * Vue.js manages reactive UI and real-time output streaming
 * Tailwind CSS provides modern, responsive styling
@@ -107,7 +107,7 @@ Both terminals intelligently combine PHP for server-side command execution with 
 * Enhanced copy/paste functionality with context menus
 * Real-time command execution with loading indicators
 
-### xterm-terminal.php Frontend (Xterm.js)
+### terminal.php Frontend (Xterm.js)
 
 * Uses xterm.js library for authentic terminal emulation
 * Native ANSI escape sequence processing
