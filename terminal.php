@@ -1,16 +1,382 @@
 <?php
 // =====================================================================
-// PHP Backend Logic for Xterm.js Terminal
-// This part handles the AJAX requests sent from the xterm.js frontend.
+// SECURITY CONFIGURATION
+// Set TERMINAL_PASSWORD to a strong password to protect this terminal
+// Leave empty ('') to allow unrestricted access (NOT RECOMMENDED)
 // =====================================================================
+define('TERMINAL_PASSWORD', ''); // Change this to a strong password!
 
-/**
- * Xterm Terminal with authentic terminal experience
- * @author Pravin Kumar
- * @version 1.0
- * @package Xterm
- * @license https://opensource.org/licenses/MIT
- */
+// Password protection logic
+session_start();
+
+if (TERMINAL_PASSWORD !== '') {
+    // Check if user is already authenticated
+    if (!isset($_SESSION['terminal_authenticated']) || $_SESSION['terminal_authenticated'] !== true) {
+        // Check if password is being submitted
+        if (isset($_POST['terminal_password'])) {
+            if ($_POST['terminal_password'] === TERMINAL_PASSWORD) {
+                $_SESSION['terminal_authenticated'] = true;
+                header('Location: ' . $_SERVER['PHP_SELF']);
+                exit;
+            } else {
+                $password_error = 'Invalid password. Please try again.';
+            }
+        }
+        
+        // Show password prompt
+        ?>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Terminal Access - Authentication Required</title>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 0;
+                    background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
+                    font-family: 'Courier New', Courier, monospace;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    color: #ffffff;
+                }
+                
+                .auth-container {
+                    background: rgba(0, 0, 0, 0.8);
+                    border: 2px solid #00ff00;
+                    border-radius: 10px;
+                    padding: 40px;
+                    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+                    text-align: center;
+                    max-width: 400px;
+                    width: 90%;
+                }
+                
+                .terminal-icon {
+                    font-size: 48px;
+                    color: #00ff00;
+                    margin-bottom: 20px;
+                }
+                
+                h1 {
+                    color: #00ff00;
+                    margin-bottom: 10px;
+                    font-size: 24px;
+                }
+                
+                .subtitle {
+                    color: #888;
+                    margin-bottom: 30px;
+                    font-size: 14px;
+                }
+                
+                .form-group {
+                    margin-bottom: 20px;
+                    text-align: left;
+                }
+                
+                label {
+                    display: block;
+                    margin-bottom: 8px;
+                    color: #00ff00;
+                    font-weight: bold;
+                }
+                
+                input[type="password"] {
+                    width: 100%;
+                    padding: 12px;
+                    background: #1a1a1a;
+                    border: 1px solid #333;
+                    border-radius: 5px;
+                    color: #ffffff;
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 16px;
+                    box-sizing: border-box;
+                }
+                
+                input[type="password"]:focus {
+                    outline: none;
+                    border-color: #00ff00;
+                    box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+                }
+                
+                .submit-btn {
+                    width: 100%;
+                    padding: 12px;
+                    background: #00ff00;
+                    color: #000000;
+                    border: none;
+                    border-radius: 5px;
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                }
+                
+                .submit-btn:hover {
+                    background: #00cc00;
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 8px rgba(0, 255, 0, 0.3);
+                }
+                
+                .error-message {
+                    background: rgba(255, 0, 0, 0.1);
+                    border: 1px solid #ff0000;
+                    color: #ff6666;
+                    padding: 10px;
+                    border-radius: 5px;
+                    margin-bottom: 20px;
+                    font-size: 14px;
+                }
+                
+                .warning {
+                    background: rgba(255, 165, 0, 0.1);
+                    border: 1px solid #ffa500;
+                    color: #ffcc66;
+                    padding: 15px;
+                    border-radius: 5px;
+                    margin-top: 20px;
+                    font-size: 12px;
+                    text-align: left;
+                }
+                
+                .warning-icon {
+                    color: #ffa500;
+                    margin-right: 8px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="auth-container">
+                <div class="terminal-icon">ЁЯЦея╕П</div>
+                <h1>Terminal Access</h1>
+                <div class="subtitle">Authentication Required</div>
+                
+                <?php if (isset($password_error)): ?>
+                    <div class="error-message">
+                        тЭМ <?php echo htmlspecialchars($password_error); ?>
+                    </div>
+                <?php endif; ?>
+                
+                <form method="POST" action="">
+                    <div class="form-group">
+                        <label for="terminal_password">Password:</label>
+                        <input type="password" id="terminal_password" name="terminal_password" 
+                               placeholder="Enter terminal password" required autofocus>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">Access Terminal</button>
+                </form>
+                
+                <div class="warning">
+                    <span class="warning-icon">тЪая╕П</span>
+                    <strong>Security Notice:</strong> This terminal allows arbitrary command execution on the server. 
+                    Only authorized users should have access to this interface.
+                </div>
+            </div>
+            
+            <script>
+                // Auto-focus password field and handle Enter key
+                document.getElementById('terminal_password').focus();
+                
+                document.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        document.querySelector('form').submit();
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        <?php
+        exit;
+    }
+}
+
+// =====================================================================
+// SECURITY CONFIGURATION
+// =====================================================================
+// Set a password to protect this terminal. Leave empty to disable password protection.
+// WARNING: This script allows arbitrary command execution on your server!
+define('TERMINAL_PASSWORD', ''); // Set your password here, e.g., 'mySecurePassword123'
+
+// Password protection logic
+session_start();
+
+if (TERMINAL_PASSWORD !== '') {
+    // Check if password verification is being submitted
+    if (isset($_POST['terminal_password'])) {
+        if ($_POST['terminal_password'] === TERMINAL_PASSWORD) {
+            $_SESSION['terminal_authenticated'] = true;
+            // Redirect to prevent password from staying in POST data
+            header('Location: ' . $_SERVER['PHP_SELF']);
+            exit;
+        } else {
+            $password_error = 'Invalid password. Access denied.';
+            $_SESSION['terminal_authenticated'] = false;
+        }
+    }
+    
+    // Check if user is authenticated
+    if (!isset($_SESSION['terminal_authenticated']) || $_SESSION['terminal_authenticated'] !== true) {
+        // Show password prompt
+        ?>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Terminal Access - Authentication Required</title>
+            <style>
+                body {
+                    font-family: 'Courier New', Courier, monospace;
+                    background: #000;
+                    color: #00ff00;
+                    margin: 0;
+                    padding: 0;
+                    height: 100vh;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    flex-direction: column;
+                }
+                .auth-container {
+                    background: #111;
+                    border: 2px solid #00ff00;
+                    border-radius: 8px;
+                    padding: 30px;
+                    text-align: center;
+                    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+                    max-width: 400px;
+                    width: 90%;
+                }
+                .logo {
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin-bottom: 20px;
+                    color: #ffffff;
+                }
+                .warning {
+                    color: #ff6b6b;
+                    font-size: 14px;
+                    margin-bottom: 20px;
+                    padding: 10px;
+                    background: rgba(255, 107, 107, 0.1);
+                    border: 1px solid #ff6b6b;
+                    border-radius: 4px;
+                }
+                .form-group {
+                    margin: 20px 0;
+                    text-align: left;
+                }
+                label {
+                    display: block;
+                    margin-bottom: 8px;
+                    color: #00ff00;
+                    font-weight: bold;
+                }
+                input[type="password"] {
+                    width: 100%;
+                    padding: 12px;
+                    background: #000;
+                    border: 1px solid #00ff00;
+                    border-radius: 4px;
+                    color: #00ff00;
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 16px;
+                    box-sizing: border-box;
+                }
+                input[type="password"]:focus {
+                    outline: none;
+                    border-color: #ffffff;
+                    box-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+                }
+                button {
+                    width: 100%;
+                    padding: 12px;
+                    background: #00ff00;
+                    color: #000;
+                    border: none;
+                    border-radius: 4px;
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: background 0.3s;
+                }
+                button:hover {
+                    background: #00cc00;
+                }
+                .error {
+                    color: #ff6b6b;
+                    margin-top: 10px;
+                    padding: 8px;
+                    background: rgba(255, 107, 107, 0.1);
+                    border-radius: 4px;
+                    font-size: 14px;
+                }
+                .info {
+                    color: #888;
+                    font-size: 12px;
+                    margin-top: 15px;
+                    line-height: 1.4;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="auth-container">
+                <div class="logo">ЁЯФТ TERMINAL ACCESS</div>
+                
+                <div class="warning">
+                    <strong>тЪая╕П RESTRICTED ACCESS</strong><br>
+                    This terminal allows system command execution.<br>
+                    Authentication required for security.
+                </div>
+                
+                <form method="POST" action="">
+                    <div class="form-group">
+                        <label for="terminal_password">Enter Password:</label>
+                        <input type="password" 
+                               id="terminal_password" 
+                               name="terminal_password" 
+                               required 
+                               autocomplete="off"
+                               autofocus>
+                    </div>
+                    
+                    <button type="submit">Access Terminal</button>
+                    
+                    <?php if (isset($password_error)): ?>
+                        <div class="error"><?php echo htmlspecialchars($password_error); ?></div>
+                    <?php endif; ?>
+                </form>
+                
+                <div class="info">
+                    Tip: To disable this password protection, set TERMINAL_PASSWORD to an empty string in the PHP file.
+                </div>
+            </div>
+            
+            <script>
+                // Auto-focus password field
+                document.getElementById('terminal_password').focus();
+                
+                // Enter key handler
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        document.querySelector('form').submit();
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        <?php
+        exit;
+    }
+}
 
 // Check if the request is a POST request with autocomplete action.
 if (isset($_POST['action']) && $_POST['action'] === 'autocomplete') {
@@ -130,26 +496,26 @@ function handleCustomLsCommand($command, $cwd) {
             $fullPath = $targetDir . DIRECTORY_SEPARATOR . $file;
             $stat = stat($fullPath);
             
-            // File permissions
-            $perms = '';
-            if (is_dir($fullPath)) {
-                $perms = 'd';
-            } elseif (is_link($fullPath)) {
-                $perms = 'l';
-            } else {
-                $perms = '-';
+            if ($stat === false) {
+                continue; // Skip files that can't be stat'd
             }
             
-            // Basic permission display
-            $perms .= is_readable($fullPath) ? 'r' : '-';
-            $perms .= is_writable($fullPath) ? 'w' : '-';
-            $perms .= is_executable($fullPath) ? 'x' : '-';
-            $perms .= is_readable($fullPath) ? 'r' : '-';
-            $perms .= is_writable($fullPath) ? 'w' : '-';
-            $perms .= is_executable($fullPath) ? 'x' : '-';
-            $perms .= is_readable($fullPath) ? 'r' : '-';
-            $perms .= is_writable($fullPath) ? 'w' : '-';
-            $perms .= is_executable($fullPath) ? 'x' : '-';
+            // Get proper Unix-style permissions
+            $perms = getFilePermissions($fullPath, $stat['mode']);
+            
+            // Get octal permission numbers
+            $octalPerms = getOctalPermissions($stat['mode']);
+            
+            // Number of hard links
+            $links = isset($stat['nlink']) ? $stat['nlink'] : 1;
+            
+            // Owner and group (simplified for cross-platform compatibility)
+            $owner = function_exists('posix_getpwuid') && isset($stat['uid']) ? 
+                     (posix_getpwuid($stat['uid'])['name'] ?? $stat['uid']) : 
+                     (isset($stat['uid']) ? $stat['uid'] : 'user');
+            $group = function_exists('posix_getgrgid') && isset($stat['gid']) ? 
+                     (posix_getgrgid($stat['gid'])['name'] ?? $stat['gid']) : 
+                     (isset($stat['gid']) ? $stat['gid'] : 'group');
             
             // File size
             $size = $stat['size'];
@@ -161,7 +527,9 @@ function handleCustomLsCommand($command, $cwd) {
             // Color-coded filename with ANSI codes
             $coloredName = getAnsiColoredFilename($file, $fullPath);
             
-            $output .= sprintf("%-10s %8s %s %s\n", $perms, $sizeFormatted, $mtime, $coloredName);
+            // Format: permissions [octal] links owner group size date filename
+            $output .= sprintf("%-10s \x1b[33m[%s]\x1b[0m %3d %-8s %-8s %8s %s %s\n", 
+                              $perms, $octalPerms, $links, $owner, $group, $sizeFormatted, $mtime, $coloredName);
         }
     } else {
         // Grid format for better space utilization
@@ -239,6 +607,77 @@ function formatFileSize($size) {
     } else {
         return round($size / (1024 * 1024 * 1024), 1) . 'G';
     }
+}
+
+/**
+ * Get octal permission numbers from file mode
+ * @param int $mode The file mode from stat()
+ * @return string Octal permission string (e.g., "644", "755")
+ */
+function getOctalPermissions($mode) {
+    // Extract permission bits (last 9 bits for owner, group, other)
+    $perms = $mode & 0777;
+    return sprintf('%o', $perms);
+}
+
+/**
+ * Convert file mode to Unix-style permission string
+ * @param string $filePath The path to the file
+ * @param int $mode The file mode from stat()
+ * @return string Unix-style permission string (e.g., "-rwxr-xr-x")
+ */
+function getFilePermissions($filePath, $mode) {
+    $perms = '';
+    
+    // File type
+    if (($mode & 0xC000) === 0xC000) {
+        $perms = 's'; // Socket
+    } elseif (($mode & 0xA000) === 0xA000) {
+        $perms = 'l'; // Symbolic link
+    } elseif (($mode & 0x8000) === 0x8000) {
+        $perms = '-'; // Regular file
+    } elseif (($mode & 0x6000) === 0x6000) {
+        $perms = 'b'; // Block special
+    } elseif (($mode & 0x4000) === 0x4000) {
+        $perms = 'd'; // Directory
+    } elseif (($mode & 0x2000) === 0x2000) {
+        $perms = 'c'; // Character special
+    } elseif (($mode & 0x1000) === 0x1000) {
+        $perms = 'p'; // FIFO pipe
+    } else {
+        $perms = '?'; // Unknown
+    }
+    
+    // Owner permissions
+    $perms .= ($mode & 0x0100) ? 'r' : '-';
+    $perms .= ($mode & 0x0080) ? 'w' : '-';
+    $perms .= ($mode & 0x0040) ? 
+              (($mode & 0x0800) ? 's' : 'x') : 
+              (($mode & 0x0800) ? 'S' : '-');
+    
+    // Group permissions
+    $perms .= ($mode & 0x0020) ? 'r' : '-';
+    $perms .= ($mode & 0x0010) ? 'w' : '-';
+    $perms .= ($mode & 0x0008) ? 
+              (($mode & 0x0400) ? 's' : 'x') : 
+              (($mode & 0x0400) ? 'S' : '-');
+    
+    // Other permissions
+    $perms .= ($mode & 0x0004) ? 'r' : '-';
+    $perms .= ($mode & 0x0002) ? 'w' : '-';
+    $perms .= ($mode & 0x0001) ? 
+              (($mode & 0x0200) ? 't' : 'x') : 
+              (($mode & 0x0200) ? 'T' : '-');
+    
+    return $perms;
+}
+
+// Handle logout request
+if (isset($_GET['logout']) && $_GET['logout'] === '1') {
+    unset($_SESSION['terminal_authenticated']);
+    session_destroy();
+    header('Location: ' . $_SERVER['PHP_SELF']);
+    exit;
 }
 
 // Check if the request is for streaming command execution
@@ -526,6 +965,29 @@ if (isset($_POST['cmd'])) {
     </style>
 </head>
 <body>
+    <?php if (TERMINAL_PASSWORD !== ''): ?>
+    <div id="logout-container" style="position: fixed; top: 10px; right: 10px; z-index: 2000;">
+        <a href="?logout=1" id="logout-btn" style="
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            border: 1px solid #ff4444;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        " onmouseover="this.style.background='rgba(255, 0, 0, 0.9)'" 
+           onmouseout="this.style.background='rgba(255, 0, 0, 0.8)'"
+           onclick="return confirm('Are you sure you want to logout?')">
+            ЁЯЪк Logout
+        </a>
+    </div>
+    <?php endif; ?>
+    
     <div id="loading-overlay">
         <div class="loading-spinner"></div>
         <div>Initializing Terminal...</div>
@@ -650,20 +1112,20 @@ if (isset($_POST['cmd'])) {
                     '\x1b[1;33m  |_|\\___|_|  |_| |_| |_|_|_| |_|\\__,_|_| |_|   |_| |_|_|    \x1b[0m',
                     '',
                     '\x1b[1;33mWelcome to the authentic terminal experience!\x1b[0m',
-                    '\x1b[32m✓ Real-time command output streaming\x1b[0m',
+                    '\x1b[32mтЬУ Real-time command output streaming\x1b[0m',
                     '\x1b[36mCurrent directory: \x1b[1;37m' + this.cwd + '\x1b[0m',
                     '',
-                    '\x1b[1;31m⚠️  SECURITY WARNING:\x1b[0m \x1b[31mThis script allows arbitrary command execution.\x1b[0m',
+                    '\x1b[1;31mтЪая╕П  SECURITY WARNING:\x1b[0m \x1b[31mThis script allows arbitrary command execution.\x1b[0m',
                     '\x1b[31mPassword-protect or delete it when not in use.\x1b[0m',
                     '',
                     '\x1b[1;34mShortcuts:\x1b[0m',
-                    '  \x1b[36m↑/↓\x1b[0m     Command history',
+                    '  \x1b[36mтЖС/тЖУ\x1b[0m     Command history',
                     '  \x1b[36mTab\x1b[0m     Auto-complete',
                     '  \x1b[36mCtrl+C\x1b[0m  Interrupt/Clear',
                     '  \x1b[36mCtrl+L\x1b[0m  Clear screen',
                     '  \x1b[36mCtrl+V\x1b[0m  Paste from clipboard',
                     '',
-                    '\x1b[90m' + '─'.repeat(64) + '\x1b[0m',
+                    '\x1b[90m' + 'тФА'.repeat(64) + '\x1b[0m',
                     ''
                 ];
                 
@@ -916,13 +1378,13 @@ if (isset($_POST['cmd'])) {
             getSpinnerChars() {
                 if (this.spinnerSize >= 18) {
                     // Extra large: Use the most visible Braille characters
-                    return ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
+                    return ['тг╛', 'тг╜', 'тг╗', 'тв┐', 'тб┐', 'тгЯ', 'тгп', 'тг╖'];
                 } else if (this.spinnerSize >= 16) {
                     // Large: More visible Braille characters
-                    return ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
+                    return ['тг╛', 'тг╜', 'тг╗', 'тв┐', 'тб┐', 'тгЯ', 'тгп', 'тг╖'];
                 } else {
                     // Normal size: Original Braille characters
-                    return ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+                    return ['таЛ', 'таЩ', 'та╣', 'та╕', 'та╝', 'та┤', 'таж', 'таз', 'таЗ', 'таП'];
                 }
             }
             
