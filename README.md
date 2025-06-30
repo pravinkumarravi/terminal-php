@@ -2,7 +2,12 @@
 
 ![PHP Web Terminal](terminal-php.png)
 
-This project provides a simple, single-file web-based terminal built with PHP for the backend and Vue.js, Tailwind CSS, and vanilla JavaScript for the frontend. It allows you to execute shell commands directly from your web browser, with real-time output streaming.
+This project provides two different web-based terminal implementations built with PHP for the backend:
+
+1. **terminal.php** - A feature-rich terminal using Vue.js, Tailwind CSS, and vanilla JavaScript
+2. **xterm-terminal.php** - A modern terminal using xterm.js for an authentic terminal experience
+
+Both terminals allow you to execute shell commands directly from your web browser with real-time output.
 
 **⚠️ SECURITY WARNING:** This script allows arbitrary command execution on the server where it is hosted. **It is highly recommended to password-protect this file or delete it when not in active use to prevent unauthorized access and potential security breaches.**
 
@@ -10,13 +15,29 @@ This project provides a simple, single-file web-based terminal built with PHP fo
 
 ## Features
 
-* **Real-time Command Execution:** Execute shell commands and see the output streamed in real time.
-* **Current Working Directory (CWD) Tracking:** The terminal maintains and displays the current working directory, updating it automatically after `cd` commands.
-* **Command History:** Navigate through previously executed commands using the Up/Down arrow keys.
-* **Basic ANSI Color Support:** Output from commands with ANSI color codes (like `ls --color=auto`) will be rendered with basic color styling.
-* **Custom Context Menu:** Right-click within the terminal to access "Copy" and "Paste" functionalities.
-* **Single File:** All logic (PHP backend, HTML, CSS, JavaScript) is contained within one `index.php` file, making it easy to deploy.
-* **Modern Frontend Stack:** Utilizes Vue.js for reactive UI, and Tailwind CSS for utility-first styling.
+### Both Terminals
+* **Real-time Command Execution:** Execute shell commands and see the output streamed in real time
+* **Current Working Directory (CWD) Tracking:** Maintains and displays the current working directory
+* **Command History:** Navigate through previously executed commands using Up/Down arrow keys
+* **Tab Completion:** Intelligent file and directory name completion
+* **Single File:** Each terminal is contained within one PHP file for easy deployment
+* **Security Warning System:** Clear warnings about security implications
+
+### terminal.php (Vue.js Terminal)
+* **Modern Frontend Stack:** Vue.js for reactive UI and Tailwind CSS for styling
+* **Real-time Output Streaming:** See command output as it happens with spinner animation
+* **Built-in File Editor:** Nano-like text editor for editing files directly in the terminal
+* **Enhanced Copy/Paste:** Custom context menu with improved clipboard functionality
+* **Linux-style Command Environment:** Ubuntu-like color coding for ls output
+* **Responsive Design:** Clean, modern interface that works on various screen sizes
+
+### xterm-terminal.php (Xterm.js Terminal)
+* **Authentic Terminal Experience:** Uses xterm.js for true terminal look and feel
+* **Full ANSI Color Support:** Complete support for terminal colors and escape sequences
+* **Native Terminal Features:** Proper cursor handling, scrollback buffer, and terminal emulation
+* **Web Links Support:** Clickable URLs in terminal output
+* **Optimized Performance:** Efficient rendering and memory usage
+* **True Terminal Shortcuts:** Native Ctrl+C, Ctrl+L, and other terminal shortcuts
 
 ---
 
@@ -29,46 +50,70 @@ This project provides a simple, single-file web-based terminal built with PHP fo
 
 ### Installation
 
-1.  **Save the file:** Save the provided code as `index.php` (or any other `.php` file) in your web server's document root or a subfolder accessible via a web browser.
-2.  **Access in Browser:** Open your web browser and navigate to the URL where you placed the `index.php` file (e.g., `http://localhost/index.php` or `http://yourdomain.com/terminal/index.php`).
+1. **Save the files:** Save either `terminal.php` or `xterm-terminal.php` (or both) in your web server's document root or a subfolder accessible via a web browser.
+2. **Access in Browser:** 
+   - For Vue.js terminal: Navigate to `http://localhost/terminal.php`
+   - For xterm.js terminal: Navigate to `http://localhost/xterm-terminal.php`
+
+### Which Terminal to Use?
+
+- **Choose `terminal.php`** if you want a modern, feature-rich interface with built-in file editing capabilities
+- **Choose `xterm-terminal.php`** if you prefer an authentic terminal experience with full ANSI support and native terminal feel
 
 ---
 
 ## Usage
 
-1.  Upon opening the `index.php` file in your browser, you'll see a terminal interface.
-2.  The prompt will show your current working directory.
-3.  Type any shell command (e.g., `ls -la`, `pwd`, `echo Hello World`) into the input field at the bottom.
-4.  Press `Enter` to execute the command.
-5.  The output will appear in the main terminal area.
-6.  Use the **Up arrow key** to cycle through previous commands.
-7.  Use the **Down arrow key** to cycle through more recent commands or clear the input.
-8.  Type `clear` and press `Enter` to clear the terminal output.
-9.  **Right-click** anywhere in the terminal to bring up a context menu with "Copy" (for selected text) and "Paste" options.
+### Basic Usage (Both Terminals)
+1. Open the terminal file in your browser
+2. The prompt will show your current working directory
+3. Type any shell command (e.g., `ls -la`, `pwd`, `echo Hello World`)
+4. Press `Enter` to execute the command
+5. Use **Up/Down arrow keys** to cycle through command history
+6. Use **Tab** for file/directory name completion
+7. Type `clear` to clear the terminal output
+
+### terminal.php Specific Features
+- **File Editor:** Type `nano filename.txt` to open the built-in editor
+- **Copy/Paste:** Right-click for context menu with copy/paste options
+- **Real-time Output:** Watch commands execute with live streaming output
+
+### xterm-terminal.php Specific Features
+- **Terminal Shortcuts:** 
+  - `Ctrl+C` to interrupt commands
+  - `Ctrl+L` to clear screen
+- **ANSI Colors:** Full support for colored output
+- **Authentic Feel:** True terminal cursor and scrollback behavior
 
 ---
 
 ## How it Works
 
-The project intelligently combines PHP for server-side command execution and a modern JavaScript framework (Vue.js) for a dynamic, interactive frontend.
+Both terminals intelligently combine PHP for server-side command execution with modern JavaScript frameworks for dynamic, interactive frontends.
 
-### PHP Backend
+### PHP Backend (Both Terminals)
 
-* When an AJAX `POST` request is received with a `cmd` parameter, the PHP script executes the command using `proc_open()` for real-time output streaming.
-* It handles disabling output buffering and gzip compression to ensure immediate feedback.
-* The `cwd` parameter in the POST request allows the PHP script to change its working directory before executing the command, simulating a persistent terminal session.
-* A special marker (`__CWD_END__`) is used to separate the command output from the new current working directory sent back to the frontend.
+* Handles AJAX `POST` requests with command parameters
+* Executes commands using `shell_exec()` or `proc_open()` for real-time output
+* Manages current working directory tracking across requests
+* Provides tab completion suggestions via separate AJAX endpoints
+* Implements custom `ls` command with ANSI color support for xterm.js
 
-### Frontend (HTML, CSS, Vue.js)
+### terminal.php Frontend (Vue.js)
 
-* The HTML provides the basic structure of the terminal.
-* Tailwind CSS is used for minimal and efficient styling, giving it a dark, terminal-like appearance.
-* Vue.js manages the reactive UI:
-    * It maintains the `history` array to display past commands and their outputs.
-    * It sends AJAX `POST` requests to the same `index.php` file with the command and current working directory.
-    * It uses `fetch` API with `response.body.getReader()` to consume the PHP output stream chunk by chunk, updating the terminal in real time.
-    * It includes basic logic to convert ANSI escape codes in the command output into HTML `<span>` elements for colored text.
-    * Keyboard shortcuts for command history (`Up`/`Down` arrows) and a custom right-click context menu for copy/paste are implemented.
+* Vue.js manages reactive UI and real-time output streaming
+* Tailwind CSS provides modern, responsive styling
+* Custom file editor implementation with syntax highlighting
+* Enhanced copy/paste functionality with context menus
+* Real-time command execution with loading indicators
+
+### xterm-terminal.php Frontend (Xterm.js)
+
+* Uses xterm.js library for authentic terminal emulation
+* Native ANSI escape sequence processing
+* True terminal cursor and scrollback behavior
+* Web links addon for clickable URLs
+* Fit addon for responsive terminal sizing
 
 ---
 

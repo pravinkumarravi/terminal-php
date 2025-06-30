@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHP Web Terminal Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .terminals {
+            padding: 40px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .terminal-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .terminal-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+            border-color: #667eea;
+        }
+        
+        .terminal-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .terminal-card h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        
+        .terminal-card p {
+            color: #7f8c8d;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .features {
+            list-style: none;
+            margin-bottom: 25px;
+        }
+        
+        .features li {
+            color: #5a6c7d;
+            margin-bottom: 8px;
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        .features li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .launch-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .launch-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 30px 40px;
+            color: #856404;
+        }
+        
+        .warning h4 {
+            color: #d63031;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            text-align: center;
+            color: #6c757d;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .terminals {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+            
+            .terminal-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ PHP Web Terminal</h1>
+            <p>Choose your terminal experience</p>
+        </div>
+        
+        <div class="warning">
+            <h4>⚠️ Security Warning</h4>
+            <p>These terminals allow arbitrary command execution on the server. Only use in secure environments and password-protect or remove when not in use.</p>
+        </div>
+        
+        <div class="terminals">
+            <div class="terminal-card">
+                <div class="terminal-icon">🎨</div>
+                <h3>Vue.js Terminal</h3>
+                <p>Feature-rich terminal with modern UI, built-in file editor, and real-time streaming.</p>
+                
+                <ul class="features">
+                    <li>Modern Vue.js interface</li>
+                    <li>Built-in nano-like editor</li>
+                    <li>Real-time output streaming</li>
+                    <li>Enhanced copy/paste</li>
+                    <li>Linux-style tab completion</li>
+                    <li>Command history</li>
+                </ul>
+                
+                <a href="terminal.php" class="launch-btn" target="_blank">Launch Vue.js Terminal</a>
+            </div>
+            
+            <div class="terminal-card">
+                <div class="terminal-icon">💻</div>
+                <h3>Xterm.js Terminal</h3>
+                <p>Authentic terminal experience with full ANSI support and true terminal emulation.</p>
+                
+                <ul class="features">
+                    <li>Authentic terminal look & feel</li>
+                    <li>Full ANSI color support</li>
+                    <li>Native terminal shortcuts</li>
+                    <li>Scrollback buffer</li>
+                    <li>Web links support</li>
+                    <li>True cursor handling</li>
+                </ul>
+                
+                <a href="xterm-terminal.php" class="launch-btn" target="_blank">Launch Xterm.js Terminal</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Built with PHP, Vue.js, and Xterm.js | MIT License</p>
+        </div>
+    </div>
+</body>
+</html>

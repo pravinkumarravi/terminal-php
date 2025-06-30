@@ -1,8 +1,16 @@
 <?php
 // =====================================================================
-// PHP Backend Logic
-// This part handles the AJAX requests sent from the Vue.js frontend.
+// PHP Backend Logic for Xterm.js Terminal
+// This part handles the AJAX requests sent from the xterm.js frontend.
 // =====================================================================
+
+/**
+ * Xterm Terminal with authentic terminal experience
+ * @author Pravin Kumar
+ * @version 1.0
+ * @package Xterm
+ * @license https://opensource.org/licenses/MIT
+ */
 
 // Check if the request is a POST request with autocomplete action.
 if (isset($_POST['action']) && $_POST['action'] === 'autocomplete') {
@@ -37,9 +45,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'autocomplete') {
         foreach ($files as $file) {
             if ($file === '.' || $file === '..') continue;
             
-            // Linux-like completion logic
-            if (empty($filename) || $filename === '*') {
-                // Show all files if empty or wildcard
+            if (empty($filename) || stripos($file, $filename) === 0) {
                 $fullPath = $searchDir . DIRECTORY_SEPARATOR . $file;
                 $suggestion = $dir . $file;
                 
@@ -49,39 +55,25 @@ if (isset($_POST['action']) && $_POST['action'] === 'autocomplete') {
                 }
                 
                 $suggestions[] = $suggestion;
-            } else {
-                // Only show files that start with the prefix (case-insensitive)
-                if (stripos($file, $filename) === 0) {
-                    $fullPath = $searchDir . DIRECTORY_SEPARATOR . $file;
-                    $suggestion = $dir . $file;
-                    
-                    // Add trailing slash for directories
-                    if (is_dir($fullPath)) {
-                        $suggestion .= '/';
-                    }
-                    
-                    $suggestions[] = $suggestion;
-                }
             }
         }
     }
     
-    // Sort suggestions alphabetically (Linux-like)
+    // Sort suggestions alphabetically
     sort($suggestions, SORT_STRING | SORT_FLAG_CASE);
     
     // Limit suggestions to prevent overwhelming output
     $suggestions = array_slice($suggestions, 0, 50);
     
-    header('Content-Type: text/plain');
-    echo implode("\n", $suggestions);
+    header('Content-Type: application/json');
+    echo json_encode($suggestions);
     exit;
 }
 
 /**
- * Custom ls command handler with Ubuntu-like colors
+ * Custom ls command handler with ANSI colors for xterm.js
  */
 function handleCustomLsCommand($command, $cwd) {
-    // Ensure the provided directory exists
     if (!is_dir($cwd)) {
         $cwd = getcwd();
     }
@@ -103,7 +95,6 @@ function handleCustomLsCommand($command, $cwd) {
             $showHidden = true;
             $longFormat = true;
         } elseif (!empty($arg) && $arg[0] !== '-') {
-            // It's a directory path
             $fullPath = $cwd . DIRECTORY_SEPARATOR . $arg;
             if (is_dir($fullPath)) {
                 $targetDir = $fullPath;
@@ -116,10 +107,7 @@ function handleCustomLsCommand($command, $cwd) {
     // Get directory listing
     $files = scandir($targetDir);
     if ($files === false) {
-        echo "ls: cannot access '$targetDir': No such file or directory\n";
-        echo "\n__CWD_END__";
-        echo $cwd;
-        return;
+        return "ls: cannot access '$targetDir': No such file or directory\n";
     }
     
     // Filter files based on options
@@ -133,6 +121,8 @@ function handleCustomLsCommand($command, $cwd) {
     
     // Sort files
     sort($filteredFiles, SORT_STRING | SORT_FLAG_CASE);
+    
+    $output = '';
     
     if ($longFormat) {
         // Long format listing
@@ -150,7 +140,7 @@ function handleCustomLsCommand($command, $cwd) {
                 $perms = '-';
             }
             
-            // Basic permission display (simplified for cross-platform compatibility)
+            // Basic permission display
             $perms .= is_readable($fullPath) ? 'r' : '-';
             $perms .= is_writable($fullPath) ? 'w' : '-';
             $perms .= is_executable($fullPath) ? 'x' : '-';
@@ -161,44 +151,57 @@ function handleCustomLsCommand($command, $cwd) {
             $perms .= is_writable($fullPath) ? 'w' : '-';
             $perms .= is_executable($fullPath) ? 'x' : '-';
             
-            // File size (formatted for readability)
+            // File size
             $size = $stat['size'];
             $sizeFormatted = formatFileSize($size);
             
             // Last modified time
             $mtime = date('M d H:i', $stat['mtime']);
             
-            // Color-coded filename
-            $coloredName = getColoredFilename($file, $fullPath);
+            // Color-coded filename with ANSI codes
+            $coloredName = getAnsiColoredFilename($file, $fullPath);
             
-            echo sprintf("%-10s %8s %s %s\n", $perms, $sizeFormatted, $mtime, $coloredName);
+            $output .= sprintf("%-10s %8s %s %s\n", $perms, $sizeFormatted, $mtime, $coloredName);
         }
     } else {
-        // Simple format - just filenames with colors, one per line
-        $output = '';
+        // Grid format for better space utilization
+        $termWidth = 80; // Default terminal width
+        $maxFileLength = 0;
         
+        // Find the longest filename for column width calculation
         foreach ($filteredFiles as $file) {
-            $fullPath = $targetDir . DIRECTORY_SEPARATOR . $file;
-            $coloredName = getColoredFilename($file, $fullPath);
-            
-            // Add the colored filename with a newline
-            $output .= $coloredName . "\n";
+            $maxFileLength = max($maxFileLength, strlen($file));
         }
         
-        echo $output;
+        $columnWidth = min($maxFileLength + 2, 20); // Max 20 chars per column
+        $columns = max(1, intval($termWidth / $columnWidth));
+        
+        $coloredFiles = [];
+        foreach ($filteredFiles as $file) {
+            $fullPath = $targetDir . DIRECTORY_SEPARATOR . $file;
+            $coloredFiles[] = getAnsiColoredFilename($file, $fullPath);
+        }
+        
+        // Output in columns
+        for ($i = 0; $i < count($coloredFiles); $i += $columns) {
+            $row = array_slice($coloredFiles, $i, $columns);
+            $output .= implode('  ', array_map(function($item) use ($columnWidth) {
+                // Strip ANSI codes for length calculation, then pad
+                $plainItem = preg_replace('/\033\[[0-9;]*m/', '', $item);
+                $padding = max(0, $columnWidth - strlen($plainItem));
+                return $item . str_repeat(' ', $padding);
+            }, $row));
+            $output .= "\n";
+        }
     }
     
-    echo "\n__CWD_END__";
-    echo $cwd;
+    return $output;
 }
 
 /**
- * Get color-coded filename with ANSI escape codes
+ * Get ANSI color-coded filename for xterm.js
  */
-function getColoredFilename($filename, $fullPath) {
-    // Ubuntu-like colors using ANSI escape codes
-    $reset = "\033[0m";
-    
+function getAnsiColoredFilename($filename, $fullPath) {
     if (is_dir($fullPath)) {
         // Directories: bold blue
         return "\033[1;34m{$filename}\033[0m";
@@ -238,959 +241,1068 @@ function formatFileSize($size) {
     }
 }
 
-// Check if the request is a POST request with a 'cmd' parameter.
-if (isset($_POST['cmd'])) {
-    // --- REAL-TIME STREAMING SETUP ---
-    // Disable gzip compression and output buffering for real-time output.
-    if (function_exists('apache_setenv')) {
-        @apache_setenv('no-gzip', 1);
-    }
-    @ini_set('zlib.output_compression', 0);
-    @ini_set('implicit_flush', 1);
-
-    // Set headers for streaming plain text
-    header('Content-Type: text/plain; charset=utf-8');
-    header('X-Content-Type-Options: nosniff');
+// Check if the request is for streaming command execution
+if (isset($_POST['cmd']) && isset($_POST['stream']) && $_POST['stream'] === 'true') {
+    // Set headers for Server-Sent Events
+    header('Content-Type: text/event-stream');
+    header('Cache-Control: no-cache');
+    header('Connection: keep-alive');
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Headers: Cache-Control');
     
-    // Clear all existing output buffers
-    while (@ob_end_flush());
-    ob_implicit_flush(true);
+    // Disable output buffering for real-time streaming
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
     
     // Get the command and the current working directory from the POST data.
     $command = $_POST['cmd'];
-    $cwd = $_POST['cwd'];
+    $cwd = $_POST['cwd'] ?? getcwd();
     
-    // Handle custom ls command with colors
-    if (preg_match('/^\s*ls(\s|$)/', $command)) {
-        handleCustomLsCommand($command, $cwd);
-        exit;
-    }
-
-    // --- SECURITY WARNING ---
-    // The use of functions like passthru() or shell_exec() is extremely
-    // dangerous if this file is publicly accessible. Anyone could run
-    // any command on your server.
-
-    // Ensure the provided directory exists and is a directory.
-    // Fallback to the script's directory if it's invalid.
+    // Ensure the provided directory exists
     if (!is_dir($cwd)) {
         $cwd = getcwd();
     }
-
-    // '2>&1' redirects stderr to stdout, so you see errors in the terminal output.
-    $full_command = 'cd ' . escapeshellarg($cwd) . ' && ' . $command . ' 2>&1';
     
-    // Use proc_open to execute the command and get pipes to its stdout.
-    $descriptorspec = array(
-       0 => array("pipe", "r"),  // stdin
-       1 => array("pipe", "w"),  // stdout
-       2 => array("pipe", "w")   // stderr (redirected to stdout)
-    );
-
-    $process = proc_open($full_command, $descriptorspec, $pipes, $cwd);
-
-    if (is_resource($process)) {
-        // We don't need stdin
-        fclose($pipes[0]);
-
-        // Set pipes to non-blocking for better real-time streaming
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
-
-        // Read from both stdout and stderr in real-time
-        while (true) {
-            $status = proc_get_status($process);
-            
-            // Read from stdout
-            $output = fread($pipes[1], 8192);
-            if ($output !== false && $output !== '') {
-                echo $output;
-                flush();
-            }
-            
-            // Read from stderr
-            $error = fread($pipes[2], 8192);
-            if ($error !== false && $error !== '') {
-                echo $error;
-                flush();
-            }
-            
-            // Break if process is no longer running and no more output
-            if (!$status['running'] && $output === '' && $error === '') {
-                break;
-            }
-            
-            // Small delay to prevent excessive CPU usage
-            usleep(10000); // 10ms
+    // Function to send SSE data
+    function sendSSE($event, $data) {
+        echo "event: $event\n";
+        echo "data: " . json_encode($data) . "\n\n";
+        flush();
+    }
+    
+    try {
+        // Handle custom ls command with colors
+        if (preg_match('/^\s*ls(\s|$)/', $command)) {
+            $output = handleCustomLsCommand($command, $cwd);
+            sendSSE('output', ['output' => $output, 'cwd' => $cwd, 'error' => false]);
+            sendSSE('complete', ['success' => true]);
+            exit;
         }
         
-        fclose($pipes[1]);
-        fclose($pipes[2]);
+        // Handle clear command
+        if (trim($command) === 'clear') {
+            sendSSE('output', ['output' => "\033[2J\033[H", 'cwd' => $cwd, 'error' => false]);
+            sendSSE('complete', ['success' => true]);
+            exit;
+        }
         
-        // Close the process
-        proc_close($process);
-    }
-
-    // After the stream, send our special marker to separate output from CWD.
-    echo "\n__CWD_END__";
-    flush();
-    
-    // For directory changes, we need to detect the new working directory
-    // Check if this was a 'cd' command or similar directory-changing command
-    if (preg_match('/^\s*cd\s+/', $command)) {
-        // Run a simple pwd command to get the current directory
-        $pwd_command = 'cd ' . escapeshellarg($cwd) . ' && ' . $command . ' && pwd 2>/dev/null';
-        $new_cwd = shell_exec($pwd_command);
-        if ($new_cwd && is_dir(trim($new_cwd))) {
-            echo trim($new_cwd);
+        // Handle directory changes
+        if (preg_match('/^\s*cd\s*(.*)$/', $command, $matches)) {
+            $targetDir = trim($matches[1]);
+            
+            if (empty($targetDir) || $targetDir === '~') {
+                $newCwd = $_SERVER['HOME'] ?? $cwd;
+            } elseif ($targetDir === '..') {
+                $newCwd = dirname($cwd);
+            } elseif ($targetDir[0] === '/') {
+                $newCwd = $targetDir;
+            } else {
+                $newCwd = $cwd . DIRECTORY_SEPARATOR . $targetDir;
+            }
+            
+            $newCwd = realpath($newCwd);
+            
+            if ($newCwd && is_dir($newCwd)) {
+                sendSSE('output', ['output' => '', 'cwd' => $newCwd, 'error' => false]);
+            } else {
+                sendSSE('output', ['output' => "cd: no such file or directory: $targetDir\n", 'cwd' => $cwd, 'error' => true]);
+            }
+            sendSSE('complete', ['success' => true]);
+            exit;
+        }
+        
+        // Execute command with real-time output streaming
+        $full_command = 'cd ' . escapeshellarg($cwd) . ' && ' . $command . ' 2>&1';
+        
+        // Use popen for real-time streaming
+        $process = popen($full_command, 'r');
+        
+        if ($process) {
+            // Stream output in real-time
+            while (!feof($process)) {
+                $chunk = fread($process, 1024); // Read in 1KB chunks
+                if ($chunk !== false && $chunk !== '') {
+                    sendSSE('chunk', ['data' => $chunk]);
+                }
+                usleep(10000); // Small delay to prevent overwhelming the client
+            }
+            
+            $exit_code = pclose($process);
+            sendSSE('complete', ['success' => $exit_code === 0, 'exit_code' => $exit_code]);
         } else {
-            echo $cwd; // Fallback to the old CWD if cd failed
+            sendSSE('error', ['message' => 'Failed to execute command']);
         }
-    } else {
-        // For non-cd commands, just return the current directory
-        echo $cwd;
+        
+    } catch (Exception $e) {
+        sendSSE('error', ['message' => $e->getMessage()]);
     }
-    flush();
     
-    // Stop script execution to prevent the HTML below from being sent in the AJAX response.
+    exit;
+}
+
+// Check if the request is a POST request with a 'cmd' parameter (non-streaming).
+if (isset($_POST['cmd'])) {
+    // Set headers for JSON response
+    header('Content-Type: application/json; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    
+    // Get the command and the current working directory from the POST data.
+    $command = $_POST['cmd'];
+    $cwd = $_POST['cwd'] ?? getcwd();
+    
+    // Ensure the provided directory exists
+    if (!is_dir($cwd)) {
+        $cwd = getcwd();
+    }
+    
+    $response = [
+        'output' => '',
+        'cwd' => $cwd,
+        'error' => false
+    ];
+    
+    try {
+        // Handle custom ls command with colors
+        if (preg_match('/^\s*ls(\s|$)/', $command)) {
+            $response['output'] = handleCustomLsCommand($command, $cwd);
+            echo json_encode($response);
+            exit;
+        }
+        
+        // Handle clear command
+        if (trim($command) === 'clear') {
+            $response['output'] = "\033[2J\033[H"; // ANSI clear screen and move cursor to home
+            echo json_encode($response);
+            exit;
+        }
+        
+        // For directory changes, we need to handle them specially
+        if (preg_match('/^\s*cd\s*(.*)$/', $command, $matches)) {
+            $targetDir = trim($matches[1]);
+            
+            if (empty($targetDir) || $targetDir === '~') {
+                $newCwd = $_SERVER['HOME'] ?? $cwd;
+            } elseif ($targetDir === '..') {
+                $newCwd = dirname($cwd);
+            } elseif ($targetDir[0] === '/') {
+                // Absolute path
+                $newCwd = $targetDir;
+            } else {
+                // Relative path
+                $newCwd = $cwd . DIRECTORY_SEPARATOR . $targetDir;
+            }
+            
+            // Normalize the path
+            $newCwd = realpath($newCwd);
+            
+            if ($newCwd && is_dir($newCwd)) {
+                $response['cwd'] = $newCwd;
+                $response['output'] = '';
+            } else {
+                $response['output'] = "cd: no such file or directory: $targetDir\n";
+                $response['error'] = true;
+            }
+            
+            echo json_encode($response);
+            exit;
+        }
+        
+        // Execute other commands
+        $full_command = 'cd ' . escapeshellarg($cwd) . ' && ' . $command . ' 2>&1';
+        
+        ob_start();
+        $output = shell_exec($full_command);
+        ob_end_clean();
+        
+        $response['output'] = $output ?: '';
+        
+    } catch (Exception $e) {
+        $response['output'] = "Error: " . $e->getMessage() . "\n";
+        $response['error'] = true;
+    }
+    
+    echo json_encode($response);
     exit;
 }
 
 // =====================================================================
-// HTML, CSS (Tailwind), and Vue.js Frontend
+// HTML Frontend with Xterm.js
 // This part is rendered on the initial page load.
 // =====================================================================
 ?>
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Terminal</title>
-    <!-- Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue.js for interactivity -->
-    <script src="https://unpkg.com/vue@3"></script>
-    <!-- Fira Code font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Xterm.js Web Terminal</title>
+    
+    <!-- Xterm.js CSS and JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
+    
     <style>
-        /* Simple styling for a terminal look and feel */
+        :root {
+            /* Global spinner font size - used for CSS elements if needed */
+            --spinner-font-size: 22px;
+        }
+        
         body {
-            background-color: #1a1b26; /* Dark theme */
-            overflow-x: hidden; /* Prevent horizontal scrolling on body */
-            font-family: 'Fira Code', monospace; /* Use Fira Code font */
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
         }
-        /* Make the input field blend seamlessly with the terminal line */
-        #command-input {
-            background: transparent;
-            border: none;
-            outline: none;
-            color: #c0caf5; /* Light text color */
+        
+        #terminal-container {
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+        }
+        
+        .terminal {
             width: 100%;
-            font-family: 'Fira Code', monospace;
+            height: 100%;
         }
-        /* Custom scrollbar for a better look */
-        ::-webkit-scrollbar {
+        
+        /* Spinner styling */
+        .spinner-char {
+            font-size: var(--spinner-font-size);
+            font-weight: bold;
+        }
+        
+        /* Custom scrollbar for terminal */
+        .xterm-viewport::-webkit-scrollbar {
             width: 8px;
         }
-        ::-webkit-scrollbar-track {
-            background: #2a2c3a;
+        
+        .xterm-viewport::-webkit-scrollbar-track {
+            background: #1a1a1a;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #4e526b;
+        
+        .xterm-viewport::-webkit-scrollbar-thumb {
+            background: #555;
             border-radius: 4px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #7a80a2;
+        
+        .xterm-viewport::-webkit-scrollbar-thumb:hover {
+            background: #777;
         }
-        /* Custom spinner animation */
-        .spinner {
-            display: inline-block;
-            animation: spin 0.8s linear infinite;
+        
+        /* Loading overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #00ff00;
+            font-size: 18px;
+            z-index: 1000;
         }
+        
+        .loading-spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #00ff00;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        /* Loading state styling */
-        #command-input:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        /* Allow text selection in terminal output and ensure text wrapping */
-        .terminal-output {
-            user-select: text;
-            -webkit-user-select: text;
-            -moz-user-select: text;
-            -ms-user-select: text;
-            word-wrap: break-word;
-            word-break: break-all;
-            overflow-wrap: break-word;
-        }
-        /* Highlight selected text */
-        ::selection {
-            background-color: #4a5568;
-            color: #fff;
-        }
-        ::-moz-selection {
-            background-color: #4a5568;
-            color: #fff;
-        }
-        /* Prevent horizontal overflow on the main app container */
-        #app {
-            max-width: 100vw;
-            overflow-x: hidden;
-            box-sizing: border-box;
-        }
-        /* Ensure input doesn't cause overflow */
-        #command-input {
-            min-width: 0;
-            max-width: 100%;
-        }
-        /* Ensure pre elements wrap text properly */
-        pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            word-break: break-all;
-            overflow-wrap: break-word;
-            max-width: 100%;
-            font-family: 'Fira Code', monospace;
-        }
-        /* Ubuntu-like directory styling */
-        .directory {
-            color: #5c7cfa !important;
-            font-weight: 600;
-        }
-        .executable {
-            color: #51cf66 !important;
-            font-weight: 500;
-        }
-        .symlink {
-            color: #22d3ee !important;
-        }
-        .compressed {
-            color: #f06292 !important;
-        }
     </style>
 </head>
-<body class="h-full text-sm text-[#c0caf5]" style="font-family: 'Fira Code', monospace;">
-
-<div id="app" class="h-full p-4 flex flex-col relative" @click="handleClick">
-    <!-- "Copied!" message -->
-    <div v-if="copySuccessMessage" class="absolute top-2 right-2 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transition-opacity duration-300 z-10">
-        {{ copySuccessMessage }}
+<body>
+    <div id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div>Initializing Terminal...</div>
     </div>
-
-    <!-- Terminal Output Area -->
-    <div class="flex-grow overflow-y-auto overflow-x-hidden terminal-output" ref="output">
-        <div class="mb-2">
-            <h1 class="text-lg text-[#7aa2f7] font-bold">PHP Web Terminal</h1>
-            <p class="text-[#a9b1d6]">
-                Welcome! Current directory is <span class="font-bold text-yellow-300"><?php echo getcwd(); ?></span>.
-            </p>
-            <p class="text-xs text-red-400 mt-2">
-                <span class="font-bold">SECURITY WARNING:</span> This script allows arbitrary command execution.
-                Password-protect or delete it when not in use.
-            </p>
-            <p class="text-xs text-blue-300 mt-1">
-                <span class="font-bold">Shortcuts:</span> 
-                ↑/↓ arrows (command history), Tab (auto-complete), Ctrl+C (clear/interrupt), Ctrl+A (select all)
-            </p>
-            <hr class="border-gray-700 my-2">
-        </div>
-        <!-- History of commands and outputs will be rendered here -->
-        <div v-for="item in history" :key="item.id" class="terminal-output">
-            <div class="flex flex-wrap">
-                <span class="text-[#bb9af7]">{{ item.prompt }}</span>
-                <span class="pl-2 text-[#c0caf5] break-all">{{ item.command }}</span>
-                <!-- Show spinner next to the currently running command -->
-                <span v-if="isLoading && item.id === history[history.length - 1].id" class="text-[#7aa2f7] ml-2 spinner">{{ currentSpinner }}</span>
-            </div>
-            <pre class="whitespace-pre-wrap text-[#a9b1d6] leading-snug terminal-output" v-html="item.output"></pre>
-        </div>
-    </div>
-
-    <!-- Input Line -->
-    <div class="flex items-start mt-2 flex-wrap">
-        <span class="text-[#bb9af7] flex-shrink-0">{{ prompt }}</span>
-        <input
-            type="text"
-            id="command-input"
-            class="pl-2 flex-1"
-            v-model="currentCommand"
-            @keyup.enter="runCommand"
-            @keyup.up="showPreviousCommand"
-            @keyup.down="showNextCommand"
-            @keydown.tab.prevent="handleTabCompletion"
-            @keydown.ctrl.c.prevent="interruptCommand"
-            @blur="focusInput"
-            @focus="isTextSelected = false"
-            ref="input"
-            autocomplete="off"
-            autofocus
-            :disabled="isLoading"
-        />
-        <!-- Loading spinner appears when command is running -->
-        <span v-if="isLoading" class="text-[#7aa2f7] ml-2 text-lg spinner">{{ currentSpinner }}</span>
-        <!-- Completion indicator -->
-        <span v-if="isCompleting && completionSuggestions.length > 0" class="text-[#f7768e] ml-2 text-xs">
-            {{ currentCompletionIndex + 1 }}/{{ completionSuggestions.length }}
-        </span>
-    </div>
-</div>
-
-<script>
-    const app = Vue.createApp({
-        data() {
-            return {
-                history: [], // Stores { id, prompt, command, output }
-                currentCommand: '',
-                commandHistory: [], // Stores just the command strings for up/down arrows
-                historyIndex: -1,
-                cwd: '<?php echo addslashes(getcwd()); ?>', // Initial working directory from PHP
-                promptUser: 'user@host', // A static user/host string
-                isLoading: false,
-                copySuccessMessage: '',
-                // Loading Animation State
-                spinnerFrames: ['|', '/', '─', '\\'],
-                currentSpinnerFrame: 0,
-                spinnerInterval: null,
-                // Auto-completion state
-                completionSuggestions: [],
-                currentCompletionIndex: -1,
-                isCompleting: false,
-                originalCommand: '',
-            };
-        },
-        computed: {
-            /**
-             * Generates the command prompt string.
-             */
-            prompt() {
-                // Replace the PHP home directory with '~' for a classic look
-                const homeDir = '<?php echo addslashes($_SERVER["HOME"] ?? ""); ?>';
-                let displayCwd = this.cwd;
-                if (homeDir && displayCwd.startsWith(homeDir)) {
-                    displayCwd = '~' + displayCwd.substring(homeDir.length);
-                }
-                return `${this.promptUser}:${displayCwd}$ `;
-            },
-
-            /**
-             * Gets the current spinner character for the loading animation.
-             */
-            currentSpinner() {
-                return this.spinnerFrames[this.currentSpinnerFrame];
+    
+    <div id="terminal-container"></div>
+    
+    <script>
+        /**
+         * XtermTerminal Class
+         * 
+         * Features:
+         * - Real-time command output streaming using Server-Sent Events
+         * - Fallback to regular fetch for compatibility
+         * - Global spinner configuration with size control
+         * 
+         * Global Configuration:
+         * - Change spinnerSize property to control spinner appearance
+         * - Sizes: 14 (normal), 16 (large), 18+ (extra large)
+         * - Use setSpinnerSize(size) method to change dynamically
+         */
+        class XtermTerminal {
+            constructor() {
+                this.term = null;
+                this.fitAddon = null;
+                this.webLinksAddon = null;
+                this.cwd = '<?php echo addslashes(getcwd()); ?>';
+                this.currentCommand = '';
+                this.commandHistory = [];
+                this.historyIndex = -1;
+                this.isLoading = false;
+                this.completionSuggestions = [];
+                this.completionIndex = -1;
+                this.originalCommand = '';
+                this.isCompleting = false;
+                // Global spinner configuration
+                this.spinnerSize = 18; // Font size for spinner in pixels
+                this.spinnerCleared = false; // Track if spinner has been cleared
+                
+                this.init();
             }
-        },
-        watch: {
-            // Watch for changes in loading state to refocus
-            isLoading(newVal, oldVal) {
-                if (oldVal === true && newVal === false) {
-                    // Command just finished, ensure focus
-                    this.forceFocus();
-                }
-            },
             
-            // Watch for changes in currentCommand to maintain focus
-            currentCommand(newVal, oldVal) {
-                // Reset completion if user is typing (not using tab completion)
-                if (!this.isCompleting) {
+            async init() {
+                // Update CSS variable for spinner size
+                document.documentElement.style.setProperty('--spinner-font-size', this.spinnerSize + 'px');
+                
+                // Create terminal instance
+                this.term = new Terminal({
+                    cursorBlink: true,
+                    cursorStyle: 'block',
+                    fontFamily: '"Fira Code", "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", Menlo, Monaco, "Courier New", monospace',
+                    fontSize: 14,
+                    lineHeight: 1.2,
+                    theme: {
+                        background: '#000000',
+                        foreground: '#ffffff',
+                        cursor: '#ffffff',
+                        cursorAccent: '#000000',
+                        selection: '#444444',
+                        black: '#000000',
+                        red: '#cd3131',
+                        green: '#0dbc79',
+                        yellow: '#e5e510',
+                        blue: '#2472c8',
+                        magenta: '#bc3fbc',
+                        cyan: '#11a8cd',
+                        white: '#e5e5e5',
+                        brightBlack: '#666666',
+                        brightRed: '#f14c4c',
+                        brightGreen: '#23d18b',
+                        brightYellow: '#f5f543',
+                        brightBlue: '#3b8eea',
+                        brightMagenta: '#d670d6',
+                        brightCyan: '#29b8db',
+                        brightWhite: '#ffffff'
+                    },
+                    allowTransparency: false,
+                    convertEol: true,
+                    scrollback: 1000,
+                    tabStopWidth: 4
+                });
+                
+                // Create addons
+                this.fitAddon = new FitAddon.FitAddon();
+                this.webLinksAddon = new WebLinksAddon.WebLinksAddon();
+                
+                // Load addons
+                this.term.loadAddon(this.fitAddon);
+                this.term.loadAddon(this.webLinksAddon);
+                
+                // Open terminal
+                this.term.open(document.getElementById('terminal-container'));
+                
+                // Fit terminal to container
+                this.fitAddon.fit();
+                
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    this.fitAddon.fit();
+                });
+                
+                // Handle terminal input
+                this.term.onData(this.handleInput.bind(this));
+                
+                // Hide loading overlay
+                document.getElementById('loading-overlay').style.display = 'none';
+                
+                // Show welcome message and prompt
+                this.showWelcome();
+                this.showPrompt();
+                
+                // Focus terminal
+                this.term.focus();
+            }
+            
+            showWelcome() {
+                const welcome = [
+                    '\x1b[1;33m _____                   _             _   ____  _   _ ____  \x1b[0m',
+                    '\x1b[1;33m|_   _|__ _ __ _ __ ___ (_)_ __   __ _| | |  _ \\| | | |  _ \\ \x1b[0m',
+                    '\x1b[1;33m  | |/ _ \\ \'__| \'_ ` _ \\| | \'_ \\ / _` | | | |_) | |_| | |_) |\x1b[0m',
+                    '\x1b[1;33m  | |  __/ |  | | | | | | | | | | (_| | | |  __/|  _  |  __/ \x1b[0m',
+                    '\x1b[1;33m  |_|\\___|_|  |_| |_| |_|_|_| |_|\\__,_|_| |_|   |_| |_|_|    \x1b[0m',
+                    '',
+                    '\x1b[1;33mWelcome to the authentic terminal experience!\x1b[0m',
+                    '\x1b[32m✓ Real-time command output streaming\x1b[0m',
+                    '\x1b[36mCurrent directory: \x1b[1;37m' + this.cwd + '\x1b[0m',
+                    '',
+                    '\x1b[1;31m⚠️  SECURITY WARNING:\x1b[0m \x1b[31mThis script allows arbitrary command execution.\x1b[0m',
+                    '\x1b[31mPassword-protect or delete it when not in use.\x1b[0m',
+                    '',
+                    '\x1b[1;34mShortcuts:\x1b[0m',
+                    '  \x1b[36m↑/↓\x1b[0m     Command history',
+                    '  \x1b[36mTab\x1b[0m     Auto-complete',
+                    '  \x1b[36mCtrl+C\x1b[0m  Interrupt/Clear',
+                    '  \x1b[36mCtrl+L\x1b[0m  Clear screen',
+                    '  \x1b[36mCtrl+V\x1b[0m  Paste from clipboard',
+                    '',
+                    '\x1b[90m' + '─'.repeat(64) + '\x1b[0m',
+                    ''
+                ];
+                
+                welcome.forEach(line => {
+                    this.term.writeln(line);
+                });
+            }
+            
+            showPrompt() {
+                if (this.isLoading) return;
+                
+                // Create a colorful prompt
+                const user = 'user';
+                const host = 'webterm';
+                const shortCwd = this.getShortPath(this.cwd);
+                
+                const prompt = `\x1b[1;32m${user}@${host}\x1b[0m:\x1b[1;34m${shortCwd}\x1b[0m$ `;
+                this.term.write(prompt);
+            }
+            
+            getShortPath(path) {
+                const homeDir = '<?php echo addslashes($_SERVER["HOME"] ?? ""); ?>';
+                if (homeDir && path.startsWith(homeDir)) {
+                    return '~' + path.substring(homeDir.length);
+                }
+                return path;
+            }
+            
+            handleInput(data) {
+                if (this.isLoading) return;
+                
+                const code = data.charCodeAt(0);
+                
+                // Handle special keys
+                switch (code) {
+                    case 13: // Enter
+                        this.executeCommand();
+                        break;
+                        
+                    case 9: // Tab
+                        this.handleTabCompletion();
+                        break;
+                        
+                    case 3: // Ctrl+C
+                        this.handleInterrupt();
+                        break;
+                        
+                    case 12: // Ctrl+L
+                        this.clearScreen();
+                        break;
+                        
+                    case 22: // Ctrl+V (paste)
+                        this.handlePaste();
+                        break;
+                        
+                    case 127: // Backspace
+                        this.handleBackspace();
+                        break;
+                        
+                    case 27: // Escape sequences (arrow keys, etc.)
+                        this.handleEscapeSequence(data);
+                        break;
+                        
+                    default:
+                        // Regular character input
+                        if (code >= 32 && code <= 126) {
+                            this.addCharacter(data);
+                        }
+                        break;
+                }
+            }
+            
+            handleEscapeSequence(data) {
+                if (data === '\x1b[A') { // Up arrow
+                    this.navigateHistory(-1);
+                } else if (data === '\x1b[B') { // Down arrow
+                    this.navigateHistory(1);
+                } else if (data === '\x1b[C') { // Right arrow
+                    // Move cursor right (if implemented)
+                } else if (data === '\x1b[D') { // Left arrow
+                    // Move cursor left (if implemented)
+                }
+            }
+            
+            addCharacter(char) {
+                this.currentCommand += char;
+                this.term.write(char);
+                this.resetCompletion();
+            }
+            
+            async handlePaste() {
+                try {
+                    // Check if clipboard API is available
+                    if (navigator.clipboard && navigator.clipboard.readText) {
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                            // Clean the text (remove newlines and non-printable characters)
+                            const cleanText = text.replace(/[\r\n]/g, ' ').replace(/[^\x20-\x7E]/g, '');
+                            this.currentCommand += cleanText;
+                            this.term.write(cleanText);
+                            this.resetCompletion();
+                        }
+                    } else {
+                        // Fallback: show a message that manual paste is needed
+                        this.term.write('\x1b[33m(Use right-click to paste)\x1b[0m');
+                        setTimeout(() => {
+                            // Clear the message after 2 seconds
+                            this.term.write('\r\x1b[K');
+                            this.showPrompt();
+                            this.term.write(this.currentCommand);
+                        }, 2000);
+                    }
+                } catch (error) {
+                    console.error('Paste failed:', error);
+                    // Show fallback message
+                    this.term.write('\x1b[33m(Use right-click to paste)\x1b[0m');
+                    setTimeout(() => {
+                        this.term.write('\r\x1b[K');
+                        this.showPrompt();
+                        this.term.write(this.currentCommand);
+                    }, 2000);
+                }
+            }
+            
+            handleBackspace() {
+                if (this.currentCommand.length > 0) {
+                    this.currentCommand = this.currentCommand.slice(0, -1);
+                    this.term.write('\b \b');
                     this.resetCompletion();
                 }
-                this.focusInput();
             }
-        },
-        methods: {
-            /**
-             * Focuses the command input field with a small delay to ensure it works reliably.
-             */
-            focusInput() {
-                this.$nextTick(() => {
-                    if (this.$refs.input) {
-                        this.$refs.input.focus();
-                    }
-                });
-            },
-
-            /**
-             * Force focus with additional delay for stubborn cases.
-             */
-            forceFocus() {
-                setTimeout(() => {
-                    this.focusInput();
-                }, 10);
-            },
-
-            /**
-             * Handles tab completion for commands and file paths (Linux-like behavior).
-             */
-            async handleTabCompletion() {
-                const command = this.currentCommand;
-                const parts = command.split(' ');
+            
+            clearCurrentLine() {
+                // Move to beginning of line and clear it
+                this.term.write('\r\x1b[K');
+            }
+            
+            redrawCurrentLine() {
+                this.clearCurrentLine();
+                this.showPrompt();
+                this.term.write(this.currentCommand);
+            }
+            
+            navigateHistory(direction) {
+                if (this.commandHistory.length === 0) return;
                 
+                if (direction === -1) { // Up
+                    if (this.historyIndex === -1) {
+                        this.historyIndex = this.commandHistory.length - 1;
+                    } else if (this.historyIndex > 0) {
+                        this.historyIndex--;
+                    }
+                } else { // Down
+                    if (this.historyIndex === -1) return;
+                    
+                    this.historyIndex++;
+                    if (this.historyIndex >= this.commandHistory.length) {
+                        this.historyIndex = -1;
+                        this.currentCommand = '';
+                        this.redrawCurrentLine();
+                        return;
+                    }
+                }
+                
+                this.currentCommand = this.commandHistory[this.historyIndex];
+                this.redrawCurrentLine();
+                this.resetCompletion();
+            }
+            
+            async handleTabCompletion() {
                 if (!this.isCompleting) {
                     // Start new completion
-                    this.originalCommand = command;
+                    this.originalCommand = this.currentCommand;
+                    this.completionSuggestions = await this.getCompletions(this.currentCommand);
+                    this.completionIndex = -1;
                     this.isCompleting = true;
-                    this.currentCompletionIndex = -1;
-                    
-                    if (parts.length === 1) {
-                        // Complete command names
-                        this.completionSuggestions = await this.getCommandCompletions(parts[0]);
-                    } else {
-                        // Complete file/directory names with Linux-like behavior
-                        const lastPart = parts[parts.length - 1];
-                        this.completionSuggestions = await this.getLinuxStyleFileCompletions(lastPart);
-                    }
+                }
+                
+                if (this.completionSuggestions.length === 0) {
+                    this.resetCompletion();
+                    return;
                 }
                 
                 if (this.completionSuggestions.length === 1) {
-                    // Exact match - auto-complete it
-                    if (parts.length === 1) {
-                        this.currentCommand = this.completionSuggestions[0];
-                    } else {
-                        const newParts = [...parts];
-                        newParts[newParts.length - 1] = this.completionSuggestions[0];
-                        this.currentCommand = newParts.join(' ');
-                    }
-                    this.isCompleting = false;
-                } else if (this.completionSuggestions.length > 1) {
-                    // Multiple matches - cycle through them
-                    this.currentCompletionIndex = (this.currentCompletionIndex + 1) % this.completionSuggestions.length;
-                    
-                    if (parts.length === 1) {
-                        this.currentCommand = this.completionSuggestions[this.currentCompletionIndex];
-                    } else {
-                        const newParts = [...parts];
-                        newParts[newParts.length - 1] = this.completionSuggestions[this.currentCompletionIndex];
-                        this.currentCommand = newParts.join(' ');
-                    }
+                    // Single match - complete it
+                    this.currentCommand = this.completionSuggestions[0];
+                    this.redrawCurrentLine();
+                    this.resetCompletion();
                 } else {
-                    // No completions found - do nothing (Linux-like behavior)
-                    this.isCompleting = false;
+                    // Multiple matches - cycle through them
+                    this.completionIndex = (this.completionIndex + 1) % this.completionSuggestions.length;
+                    this.currentCommand = this.completionSuggestions[this.completionIndex];
+                    this.redrawCurrentLine();
+                    
+                    // Show completion count
+                    this.term.write(`\x1b[90m (${this.completionIndex + 1}/${this.completionSuggestions.length})\x1b[0m`);
                 }
-            },
-
-            /**
-             * Gets command completions from a predefined list.
-             */
-            async getCommandCompletions(prefix) {
-                const commonCommands = [
-                    'ls', 'dir', 'cd', 'pwd', 'mkdir', 'rmdir', 'rm', 'cp', 'mv', 'cat', 'echo',
-                    'grep', 'find', 'chmod', 'chown', 'ps', 'kill', 'top', 'htop', 'df', 'du',
-                    'tar', 'zip', 'unzip', 'wget', 'curl', 'git', 'npm', 'node', 'php', 'python',
-                    'python3', 'java', 'javac', 'gcc', 'make', 'cmake', 'vim', 'nano', 'emacs',
-                    'clear', 'exit', 'history', 'which', 'whereis', 'man', 'help', 'sudo', 'su'
-                ];
+            }
+            
+            async getCompletions(command) {
+                const parts = command.split(' ');
+                const lastPart = parts[parts.length - 1];
                 
-                if (!prefix) return commonCommands.slice(0, 10);
-                
-                return commonCommands.filter(cmd => cmd.startsWith(prefix.toLowerCase()));
-            },
-
-            /**
-             * Gets file/directory completions from the server (Linux-style behavior).
-             */
-            async getLinuxStyleFileCompletions(prefix) {
                 try {
                     const formData = new FormData();
                     formData.append('action', 'autocomplete');
-                    formData.append('prefix', prefix);
+                    formData.append('prefix', lastPart);
                     formData.append('cwd', this.cwd);
                     
-                    const response = await fetch('', {
+                    const response = await fetch(window.location.href, {
                         method: 'POST',
-                        body: formData,
+                        body: formData
                     });
                     
-                    if (response.ok) {
-                        const suggestions = await response.text();
-                        const allSuggestions = suggestions.split('\n').filter(s => s.trim());
-                        
-                        // Linux-like behavior: only return suggestions if there's an exact prefix match
-                        if (prefix === '' || prefix.includes('*')) {
-                            // Show all files/directories if empty or contains wildcard
-                            return allSuggestions;
-                        } else {
-                            // Only return exact matches that start with the prefix
-                            const exactMatches = allSuggestions.filter(suggestion => {
-                                const baseName = suggestion.replace(/\/$/, ''); // Remove trailing slash for comparison
-                                return baseName.toLowerCase().startsWith(prefix.toLowerCase());
-                            });
-                            
-                            // If there's exactly one match that completes the prefix, return it
-                            if (exactMatches.length === 1) {
-                                return exactMatches;
-                            }
-                            
-                            // If there are multiple matches that start with the same prefix, return them
-                            if (exactMatches.length > 1) {
-                                return exactMatches;
-                            }
-                            
-                            // No exact matches - return empty (Linux-like: do nothing)
-                            return [];
-                        }
-                    }
-                } catch (error) {
-                    console.error('Autocomplete error:', error);
-                }
-                return [];
-            },
-
-            /**
-             * Gets file/directory completions from the server.
-             */
-            async getFileCompletions(prefix) {
-                try {
-                    const formData = new FormData();
-                    formData.append('action', 'autocomplete');
-                    formData.append('prefix', prefix);
-                    formData.append('cwd', this.cwd);
+                    const suggestions = await response.json();
                     
-                    const response = await fetch('', {
-                        method: 'POST',
-                        body: formData,
+                    // Complete the full command with suggestions
+                    return suggestions.map(suggestion => {
+                        const commandParts = parts.slice(0, -1);
+                        commandParts.push(suggestion);
+                        return commandParts.join(' ');
                     });
-                    
-                    if (response.ok) {
-                        const suggestions = await response.text();
-                        return suggestions.split('\n').filter(s => s.trim());
-                    }
                 } catch (error) {
-                    console.error('Autocomplete error:', error);
+                    console.error('Completion error:', error);
+                    return [];
                 }
-                return [];
-            },
-
-            /**
-             * Resets completion state when user types or navigates.
-             */
+            }
+            
             resetCompletion() {
                 this.isCompleting = false;
                 this.completionSuggestions = [];
-                this.currentCompletionIndex = -1;
+                this.completionIndex = -1;
                 this.originalCommand = '';
-            },
-
-            /**
-             * Interrupts the current running command (Ctrl+C).
-             */
-            interruptCommand() {
+            }
+            
+            handleInterrupt() {
                 if (this.isLoading) {
-                    // If a command is running, we can't easily interrupt it with the current setup
-                    // This would require WebSocket implementation for true interruption
-                    this.showCopyMessage('Ctrl+C (interruption not implemented in HTTP mode)');
+                    this.term.writeln('\n\x1b[31m^C\x1b[0m');
+                    this.term.writeln('\x1b[33mCommand interrupted (HTTP mode - cannot kill process)\x1b[0m');
                 } else {
-                    // Clear current input
-                    this.currentCommand = '';
-                    this.resetCompletion();
+                    this.term.writeln('\n\x1b[31m^C\x1b[0m');
                 }
-            },
-
-            /**
-             * Starts the spinner animation.
-             */
-            startSpinner() {
-                this.currentSpinnerFrame = 0;
-                this.spinnerInterval = setInterval(() => {
-                    this.currentSpinnerFrame = (this.currentSpinnerFrame + 1) % this.spinnerFrames.length;
-                }, 200); // Change frame every 200ms for simple characters
-            },
-
-            /**
-             * Stops the spinner animation.
-             */
-            stopSpinner() {
-                if (this.spinnerInterval) {
-                    clearInterval(this.spinnerInterval);
-                    this.spinnerInterval = null;
+                
+                this.currentCommand = '';
+                this.resetCompletion();
+                this.isLoading = false;
+                this.showPrompt();
+            }
+            
+            getSpinnerChars() {
+                if (this.spinnerSize >= 18) {
+                    // Extra large: Use the most visible Braille characters
+                    return ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
+                } else if (this.spinnerSize >= 16) {
+                    // Large: More visible Braille characters
+                    return ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
+                } else {
+                    // Normal size: Original Braille characters
+                    return ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
                 }
-            },
+            }
             
-            /**
-             * Scrolls the output container to the bottom.
-             */
-            scrollToBottom() {
-                this.$nextTick(() => {
-                    const outputEl = this.$refs.output;
-                    if (outputEl) {
-                        outputEl.scrollTop = outputEl.scrollHeight;
-                    }
-                    // Ensure focus is maintained after scrolling
-                    this.focusInput();
-                });
-            },
+            getSpinnerStyle() {
+                // Enhanced spinner styling for better visibility
+                if (this.spinnerSize >= 16) {
+                    // For larger sizes, use bold white with potential background
+                    return '\x1b[1;37m'; // Bold bright white
+                } else {
+                    return '\x1b[37m'; // Normal white
+                }
+            }
             
-            /**
-             * Handles clicks on the main container to focus the input.
-             */
-            handleClick() {
-                this.focusInput();
-            },
-
-            /**
-             * Handles the execution of a command.
-             */
-            async runCommand() {
-                if (this.isLoading) return; // Don't run commands if one is already in progress
-
+            setSpinnerSize(size) {
+                this.spinnerSize = size;
+                // Update CSS variable
+                document.documentElement.style.setProperty('--spinner-font-size', size + 'px');
+            }
+            
+            clearScreen() {
+                this.term.write('\x1b[2J\x1b[H');
+                this.showPrompt();
+            }
+            
+            async executeCommand() {
                 const command = this.currentCommand.trim();
+                
+                this.term.writeln(''); // Move to next line
+                
                 if (!command) {
-                     // Add an empty line to history for an empty command
-                    this.history.push({
-                        id: Date.now(),
-                        prompt: this.prompt,
-                        command: '',
-                        output: ''
-                    });
-                    this.scrollToBottom();
-                    this.focusInput(); // Focus after empty command
-                    return;
-                };
-
-                // Add to command history for up/down arrow navigation
-                this.commandHistory.push(command);
-                this.historyIndex = this.commandHistory.length;
-
-                // Handle 'clear' as a frontend-only command
-                if (command.toLowerCase() === 'clear') {
-                    this.history = [];
-                    this.currentCommand = '';
-                    this.focusInput(); // Focus after clear command
+                    this.showPrompt();
                     return;
                 }
                 
-                // Add the command to the display history immediately
-                const historyId = Date.now();
-                this.history.push({
-                    id: historyId,
-                    prompt: this.prompt,
-                    command: command,
-                    output: '' // Start with empty output
-                });
+                // Add to history
+                if (this.commandHistory[this.commandHistory.length - 1] !== command) {
+                    this.commandHistory.push(command);
+                }
+                this.historyIndex = -1;
+                this.resetCompletion();
+                
+                // Handle built-in commands
+                if (command === 'clear' || command === 'cls') {
+                    this.clearScreen();
+                    this.currentCommand = '';
+                    return;
+                }
                 
                 this.isLoading = true;
                 this.currentCommand = '';
-                this.startSpinner(); // Start the spinner animation
-                this.scrollToBottom();
-
-                // Prepare data for the fetch request
+                this.spinnerCleared = false; // Reset spinner state
+                
+                // Start spinner animation immediately
+                let spinnerState = 0;
+                const spinnerChars = this.getSpinnerChars();
+                const spinnerStyle = this.getSpinnerStyle();
+                
+                // Show initial spinner
+                this.term.write(`${spinnerStyle}${spinnerChars[spinnerState]} \x1b[90m\x1b[0m`);
+                
+                const spinnerInterval = setInterval(() => {
+                    if (!this.isLoading) {
+                        clearInterval(spinnerInterval);
+                        return;
+                    }
+                    
+                    spinnerState = (spinnerState + 1) % spinnerChars.length;
+                    
+                    // Update spinner at beginning of current line
+                    this.term.write(`\r${spinnerStyle}${spinnerChars[spinnerState]} \x1b[90m\x1b[0m \x1b[K`);
+                }, 100);
+                
+                try {
+                    // Use streaming for real-time output, with fallback to regular fetch
+                    let streamingSuccessful = false;
+                    try {
+                        await this.executeCommandStreaming(command, spinnerInterval);
+                        streamingSuccessful = true;
+                    } catch (streamError) {
+                        console.warn('Streaming failed, falling back to regular fetch:', streamError);
+                        clearInterval(spinnerInterval);
+                        this.term.write('\r\x1b[K'); // Clear spinner
+                        this.isLoading = true; // Reset loading state for fallback
+                        await this.executeCommandFallback(command, null); // Don't pass spinner interval
+                        streamingSuccessful = true;
+                    }
+                    
+                    // If neither streaming nor fallback worked, show an error
+                    if (!streamingSuccessful) {
+                        throw new Error('Both streaming and fallback failed');
+                    }
+                } catch (error) {
+                    // Stop spinner and clear loading indicator
+                    clearInterval(spinnerInterval);
+                    this.term.write('\r\x1b[K');
+                    this.term.writeln('\x1b[31mError: Network request failed\x1b[0m');
+                    console.error('Command execution error:', error);
+                    this.isLoading = false;
+                }
+                
+                this.showPrompt();
+            }
+            
+            async executeCommandStreaming(command, spinnerInterval) {
+                return new Promise((resolve, reject) => {
+                    const formData = new FormData();
+                    formData.append('cmd', command);
+                    formData.append('cwd', this.cwd);
+                    formData.append('stream', 'true');
+                    
+                    const xhr = new XMLHttpRequest();
+                    let outputBuffer = '';
+                    let spinnerCleared = false;
+                    let hasOutput = false;
+                    let isSSEResponse = false;
+                    
+                    xhr.open('POST', window.location.href, true);
+                    
+                    xhr.onreadystatechange = () => {
+                        if (xhr.readyState === XMLHttpRequest.LOADING || xhr.readyState === XMLHttpRequest.DONE) {
+                            const response = xhr.responseText;
+                            const newData = response.substring(outputBuffer.length);
+                            outputBuffer = response;
+                            
+                            if (newData) {
+                                hasOutput = true;
+                                
+                                // Check if this is an SSE response
+                                if (newData.includes('event:') || newData.includes('data:')) {
+                                    isSSEResponse = true;
+                                }
+                                
+                                this.processStreamData(newData, spinnerInterval, () => {
+                                    spinnerCleared = true;
+                                });
+                            }
+                            
+                            if (xhr.readyState === XMLHttpRequest.DONE) {
+                                // If we got a response but it wasn't SSE format and we didn't process it yet
+                                if (hasOutput && !isSSEResponse && !spinnerCleared && outputBuffer.trim()) {
+                                    console.warn('Received non-SSE response in streaming mode');
+                                    reject(new Error('Non-SSE response received'));
+                                    return;
+                                }
+                                
+                                // If no output was received through streaming, clear spinner
+                                if (!spinnerCleared && !hasOutput) {
+                                    clearInterval(spinnerInterval);
+                                    this.term.write('\r\x1b[K'); // Clear spinner line
+                                }
+                                this.isLoading = false;
+                                
+                                // Check for successful completion but no output
+                                if (xhr.status === 200 && !hasOutput) {
+                                    console.warn('Command completed but no streaming output received');
+                                }
+                                
+                                resolve();
+                            }
+                        }
+                    };
+                    
+                    xhr.ontimeout = () => {
+                        clearInterval(spinnerInterval);
+                        this.term.write('\r\x1b[K');
+                        this.isLoading = false;
+                        reject(new Error('Request timeout'));
+                    };
+                    
+                    xhr.onerror = () => {
+                        clearInterval(spinnerInterval);
+                        this.term.write('\r\x1b[K');
+                        this.isLoading = false;
+                        reject(new Error('Network error'));
+                    };
+                    
+                    // Set timeout to 30 seconds
+                    xhr.timeout = 30000;
+                    xhr.send(formData);
+                });
+            }
+            
+            processStreamData(data, spinnerInterval, onSpinnerCleared) {
+                const lines = data.split('\n');
+                
+                for (const line of lines) {
+                    if (line.trim() === '') continue; // Skip empty lines
+                    
+                    if (line.startsWith('event: ') || line.startsWith('data: ')) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = line.substring(6);
+                                if (jsonData.trim()) {
+                                    const eventData = JSON.parse(jsonData);
+                                    this.handleStreamEvent(eventData, spinnerInterval, onSpinnerCleared);
+                                }
+                            } catch (e) {
+                                console.warn('Failed to parse SSE data:', line, e);
+                                // If JSON parsing fails, treat as raw output
+                                if (!this.spinnerCleared) {
+                                    this.term.write('\r\x1b[K\n');
+                                    this.spinnerCleared = true;
+                                    clearInterval(spinnerInterval);
+                                    onSpinnerCleared();
+                                }
+                                this.term.write(line.substring(6));
+                            }
+                        }
+                    } else if (line.startsWith('{') && (line.includes('"output"') || line.includes('"cwd"'))) {
+                        // Handle JSON response that wasn't properly formatted as SSE
+                        try {
+                            const jsonResponse = JSON.parse(line);
+                            if (!this.spinnerCleared) {
+                                this.term.write('\r\x1b[K\n');
+                                this.spinnerCleared = true;
+                                clearInterval(spinnerInterval);
+                                onSpinnerCleared();
+                            }
+                            
+                            // Update CWD if provided
+                            if (jsonResponse.cwd) {
+                                this.cwd = jsonResponse.cwd;
+                            }
+                            
+                            // Display output if available
+                            if (jsonResponse.output) {
+                                this.writeWithAnsi(jsonResponse.output);
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse JSON response:', line, e);
+                            // Fallback to raw display
+                            if (!this.spinnerCleared) {
+                                this.term.write('\r\x1b[K\n');
+                                this.spinnerCleared = true;
+                                clearInterval(spinnerInterval);
+                                onSpinnerCleared();
+                            }
+                            this.term.writeln('\x1b[31mReceived malformed response\x1b[0m');
+                        }
+                    } else {
+                        // Handle non-SSE formatted responses (fallback for regular responses)
+                        if (line.trim()) {
+                            if (!this.spinnerCleared) {
+                                this.term.write('\r\x1b[K\n');
+                                this.spinnerCleared = true;
+                                clearInterval(spinnerInterval);
+                                onSpinnerCleared();
+                            }
+                            this.term.writeln(line);
+                        }
+                    }
+                }
+            }
+            
+            handleStreamEvent(eventData, spinnerInterval, onSpinnerCleared) {
+                if (eventData.data) {
+                    // Real-time chunk output - clear spinner and move to new line first
+                    if (!this.spinnerCleared) {
+                        this.term.write('\r\x1b[K\n'); // Clear spinner line then go to new line
+                        this.spinnerCleared = true;
+                        clearInterval(spinnerInterval);
+                        onSpinnerCleared();
+                    }
+                    this.term.write(eventData.data);
+                } else if (eventData.output !== undefined) {
+                    // Complete output (for fast commands)
+                    if (!this.spinnerCleared) {
+                        clearInterval(spinnerInterval);
+                        this.spinnerCleared = true;
+                        onSpinnerCleared();
+                        // Always add newline if there's any output (even empty string)
+                        this.term.write('\r\x1b[K\n'); // Clear spinner line then go to new line
+                    }
+                    // Show output even if it's empty (some commands legitimately return empty output)
+                    if (eventData.output) {
+                        this.writeWithAnsi(eventData.output);
+                    }
+                    
+                    // Update current working directory
+                    if (eventData.cwd) {
+                        this.cwd = eventData.cwd;
+                    }
+                } else if (eventData.message) {
+                    // Error message
+                    if (!this.spinnerCleared) {
+                        this.term.write('\r\x1b[K\n'); // Clear spinner line then go to new line
+                        this.spinnerCleared = true;
+                        clearInterval(spinnerInterval);
+                        onSpinnerCleared();
+                    }
+                    this.term.writeln('\x1b[31mError: ' + eventData.message + '\x1b[0m');
+                } else if (eventData.success !== undefined) {
+                    // Command completed - clear spinner if not already cleared
+                    if (!this.spinnerCleared) {
+                        clearInterval(spinnerInterval);
+                        this.term.write('\r\x1b[K'); // Clear spinner line completely, no newline
+                        this.spinnerCleared = true;
+                        onSpinnerCleared();
+                    }
+                }
+            }
+            
+            async executeCommandFallback(command, spinnerInterval) {
                 const formData = new FormData();
                 formData.append('cmd', command);
                 formData.append('cwd', this.cwd);
                 
                 try {
-                    const response = await fetch('', { // Post to the same file
+                    const response = await fetch(window.location.href, {
                         method: 'POST',
-                        body: formData,
+                        body: formData
                     });
-
+                    
                     if (!response.ok) {
-                       throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    // --- REAL-TIME STREAM HANDLING ---
-                    const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
-                    let fullOutput = '';
-                    
-                    const historyItem = this.history.find(h => h.id === historyId);
-
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) {
-                            break; // Stream finished
-                        }
-                        
-                        const chunk = decoder.decode(value, { stream: true });
-                        fullOutput += chunk;
-
-                        // Update the history item's output in real-time
-                        if (historyItem) {
-                            // Find the CWD marker in the full output
-                            const endMarkerIndex = fullOutput.indexOf('__CWD_END__');
-                            if (endMarkerIndex !== -1) {
-                                // If marker found, display only the part before it
-                                const outputPart = fullOutput.substring(0, endMarkerIndex);
-                                historyItem.output = this.ansiToHtml(outputPart);
-                                // Don't break here, continue reading for CWD info
-                            } else {
-                                // Otherwise, display everything received so far
-                                historyItem.output = this.ansiToHtml(fullOutput);
-                            }
-                        }
-                        this.scrollToBottom();
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                     
-                    // Once the stream is finished, parse the full output for CWD
-                    const parts = fullOutput.split('__CWD_END__');
-                    const finalOutput = parts[0] || '';
-                    const newCwd = parts[1] ? parts[1].trim() : this.cwd;
+                    const result = await response.json();
                     
-                    if (historyItem) {
-                         historyItem.output = this.ansiToHtml(finalOutput);
+                    // Clear spinner completely (only if not already cleared)
+                    if (this.isLoading && spinnerInterval) {
+                        clearInterval(spinnerInterval);
+                        this.term.write('\r\x1b[K'); // Clear spinner line
                     }
-                    this.cwd = newCwd;
-
-                } catch (error) {
-                    // Handle network errors or other issues
-                    const historyItem = this.history.find(h => h.id === historyId);
-                     if (historyItem) {
-                        historyItem.output = `<span class="text-red-400">Error: ${error.message}</span>`;
-                    }
-                } finally {
                     this.isLoading = false;
-                    this.stopSpinner(); // Stop the spinner animation
-                    this.scrollToBottom();
-                    this.forceFocus(); // Force focus after command completion
-                }
-            },
-
-            /**
-             * Navigates to the previous command in history.
-             */
-            showPreviousCommand() {
-                this.resetCompletion(); // Reset completion when navigating history
-                
-                if (this.historyIndex > 0) {
-                    this.historyIndex--;
-                    this.currentCommand = this.commandHistory[this.historyIndex];
-                } else if (this.historyIndex === -1 && this.commandHistory.length > 0) {
-                    // First time pressing up arrow
-                    this.historyIndex = this.commandHistory.length - 1;
-                    this.currentCommand = this.commandHistory[this.historyIndex];
-                }
-                this.focusInput(); // Ensure focus after navigation
-            },
-            
-            /**
-             * Navigates to the next command in history.
-             */
-            showNextCommand() {
-                this.resetCompletion(); // Reset completion when navigating history
-                
-                if (this.historyIndex < this.commandHistory.length - 1 && this.historyIndex !== -1) {
-                    this.historyIndex++;
-                    this.currentCommand = this.commandHistory[this.historyIndex];
-                } else {
-                    // Reached the end, clear the command
-                    this.historyIndex = this.commandHistory.length;
-                    this.currentCommand = '';
-                }
-                this.focusInput(); // Ensure focus after navigation
-            },
-            
-            /**
-             * Displays a temporary message for copy success/failure.
-             */
-            showCopyMessage(message) {
-                this.copySuccessMessage = message;
-                setTimeout(() => {
-                    this.copySuccessMessage = '';
-                    this.focusInput(); // Focus after message disappears
-                }, 1500); // Message disappears after 1.5 seconds
-            },
-
-            /**
-             * Enhanced converter for ANSI color codes and formatting to HTML spans.
-             * Also handles Ubuntu-like file type coloring.
-             */
-            ansiToHtml(text) {
-                const ansiColors = {
-                    // Standard colors
-                    '30': '#000000', '31': '#cd0000', '32': '#00cd00', '33': '#cdcd00',
-                    '34': '#0000ee', '35': '#cd00cd', '36': '#00cdcd', '37': '#e5e5e5',
-                    // Bright colors
-                    '90': '#7f7f7f', '91': '#ff0000', '92': '#00ff00', '93': '#ffff00',
-                    '94': '#5c5cff', '95': '#ff00ff', '96': '#00ffff', '97': '#ffffff',
-                    // Bold colors (1;3x)
-                    '1;30': '#555753', '1;31': '#ff5555', '1;32': '#55ff55', '1;33': '#ffff55',
-                    '1;34': '#5555ff', '1;35': '#ff55ff', '1;36': '#55ffff', '1;37': '#ffffff'
-                };
-                
-                // Escape HTML to prevent XSS
-                let safeText = document.createElement('div');
-                safeText.innerText = text;
-                safeText = safeText.innerHTML;
-
-                // Handle various ANSI escape sequences
-                let processedText = safeText
-                    // Bold color codes (1;3xm)
-                    .replace(/\u001b\[1;(\d+)m(.*?)\u001b\[0m/g, (match, code, content) => {
-                        const colorKey = '1;' + code;
-                        const color = ansiColors[colorKey] || ansiColors[code] || 'inherit';
-                        return `<span style="color:${color}; font-weight: bold;">${content}</span>`;
-                    })
-                    // Regular color codes with reset
-                    .replace(/\u001b\[(\d+)m(.*?)\u001b\[0m/g, (match, code, content) => {
-                        const color = ansiColors[code] || 'inherit';
-                        return `<span style="color:${color}">${content}</span>`;
-                    })
-                    // Bold color codes without explicit reset
-                    .replace(/\u001b\[1;(\d+)m([^\u001b]*)/g, (match, code, content) => {
-                        const colorKey = '1;' + code;
-                        const color = ansiColors[colorKey] || ansiColors[code] || 'inherit';
-                        return `<span style="color:${color}; font-weight: bold;">${content}</span>`;
-                    })
-                    // Regular color codes without explicit reset
-                    .replace(/\u001b\[(\d+)m([^\u001b]*)/g, (match, code, content) => {
-                        const color = ansiColors[code] || 'inherit';
-                        return `<span style="color:${color}">${content}</span>`;
-                    })
-                    // Bold text
-                    .replace(/\u001b\[1m(.*?)\u001b\[0m/g, '<strong>$1</strong>')
-                    .replace(/\u001b\[1m([^\u001b]*)/g, '<strong>$1</strong>')
-                    // Clear screen
-                    .replace(/\u001b\[2J/g, '')
-                    // Clear line
-                    .replace(/\u001b\[K/g, '')
-                    // Reset all formatting
-                    .replace(/\u001b\[0m/g, '</span>')
-                    // Remove other escape sequences
-                    .replace(/\u001b\[[0-9;]*[A-Za-z]/g, '');
-
-                // Apply Ubuntu-like file type coloring for non-ANSI text
-                if (!processedText.includes('<span')) {
-                    processedText = this.applyUbuntuFileColors(processedText);
-                }
-                
-                return processedText;
-            },
-
-            /**
-             * Applies Ubuntu-like file type coloring to text output.
-             */
-            applyUbuntuFileColors(text) {
-                // Skip if text already has HTML spans (already processed)
-                if (text.includes('<span')) {
-                    return text;
-                }
-                
-                // Split text into lines for processing
-                const lines = text.split('\n');
-                const processedLines = lines.map(line => {
-                    // Skip empty lines or lines that look like system output
-                    if (!line.trim() || line.includes(':') || line.includes('$')) {
-                        return line;
+                    
+                    // Update current working directory
+                    if (result.cwd) {
+                        this.cwd = result.cwd;
                     }
                     
-                    // Split line into words (file/directory names)
-                    const words = line.split(/(\s+)/);
-                    const processedWords = words.map(word => {
-                        const trimmed = word.trim();
-                        if (!trimmed || trimmed.match(/^\s+$/)) {
-                            return word; // Return whitespace as-is
+                    // Display output - always show output if present, even if it's just whitespace
+                    if (result.output !== undefined) {
+                        if (result.output.trim()) {
+                            this.term.write('\n'); // Add newline before output
+                            this.writeWithAnsi(result.output);
+                        } else if (result.output.length > 0) {
+                            // Output exists but is only whitespace - still show it
+                            this.term.write('\n');
+                            this.term.write(result.output);
                         }
-                        
-                        // Check if it's a directory (ends with /)
-                        if (trimmed.endsWith('/')) {
-                            return `<span class="directory">${word}</span>`;
-                        }
-                        
-                        // Check if it's an executable file
-                        if (trimmed.match(/\.(exe|sh|bat|com|cmd|py|pl|rb|php|js|bin)$/i)) {
-                            return `<span class="executable">${word}</span>`;
-                        }
-                        
-                        // Check if it's a compressed file
-                        if (trimmed.match(/\.(zip|tar|gz|bz2|xz|7z|rar|deb|rpm)$/i)) {
-                            return `<span class="compressed">${word}</span>`;
-                        }
-                        
-                        // Check for symbolic links (indicated by -> in ls -la output)
-                        if (line.includes(' -> ')) {
-                            const parts = line.split(' -> ');
-                            if (parts.length === 2) {
-                                return line.replace(parts[0], `<span class="symlink">${parts[0]}</span>`);
-                            }
-                        }
-                        
-                        return word;
-                    });
+                    }
                     
-                    return processedWords.join('');
-                });
-                
-                return processedLines.join('\n');
+                    if (result.error) {
+                        // Error styling is handled by ANSI codes in the output
+                        console.warn('Command executed with error flag:', result);
+                    }
+                    
+                } catch (error) {
+                    // Clear spinner if it exists
+                    if (this.isLoading && spinnerInterval) {
+                        clearInterval(spinnerInterval);
+                        this.term.write('\r\x1b[K');
+                    }
+                    this.isLoading = false;
+                    
+                    console.error('Fallback execution failed:', error);
+                    this.term.write('\n');
+                    this.term.writeln('\x1b[31mError: Failed to execute command via fallback method\x1b[0m');
+                    this.term.writeln('\x1b[31m' + error.message + '\x1b[0m');
+                }
             }
-        },
-        mounted() {
-            this.focusInput();
             
-            // Add global event listeners to maintain focus
-            document.addEventListener('click', () => {
-                // Small delay to allow other click handlers to complete
-                setTimeout(() => {
-                    this.focusInput();
-                }, 50);
-            });
-            
-            // Focus when the window regains focus
-            window.addEventListener('focus', () => {
-                this.focusInput();
-            });
-            
-            // Focus when user returns to the tab
-            document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) {
-                    this.focusInput();
-                }
-            });
-            
-            // Prevent losing focus during key navigation
-            document.addEventListener('keydown', (e) => {
-                // Handle Ctrl+C for copying when text is selected
-                if (e.ctrlKey && e.key === 'c') {
-                    const selectedText = window.getSelection().toString();
-                    if (selectedText.length > 0) {
-                        // Let the browser handle the copy, then show message
-                        setTimeout(() => {
-                            this.showCopyMessage('Copied with Ctrl+C!');
-                        }, 100);
-                        return; // Don't prevent default, let browser copy
-                    }
-                    // If no text selected and input is focused, treat as interrupt command
-                    if (document.activeElement === this.$refs.input) {
-                        e.preventDefault();
-                        this.interruptCommand();
+            writeWithAnsi(text) {
+                // xterm.js handles ANSI codes natively, so we can write directly
+                const lines = text.split('\n');
+                lines.forEach((line, index) => {
+                    if (index === lines.length - 1 && line === '') {
+                        // Don't write empty last line (avoid extra newline)
                         return;
                     }
-                }
-                
-                // Handle Ctrl+A to select all terminal content
-                if (e.ctrlKey && e.key === 'a' && document.activeElement !== this.$refs.input) {
-                    e.preventDefault();
-                    const outputEl = this.$refs.output;
-                    if (outputEl) {
-                        const range = document.createRange();
-                        range.selectNodeContents(outputEl);
-                        const selection = window.getSelection();
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                        this.showCopyMessage('All content selected - Ctrl+C to copy');
-                    }
-                    return;
-                }
-                
-                // If focus is lost and it's not a special key, refocus
-                if (document.activeElement !== this.$refs.input && 
-                    !['Tab', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'].includes(e.key)) {
-                    this.focusInput();
-                }
-            });
-        },
-        beforeUnmount() {
-            // Clean up spinner interval if component is destroyed
-            this.stopSpinner();
+                    this.term.writeln(line);
+                });
+            }
         }
-    });
-
-    app.mount('#app');
-</script>
-
+        
+        // Initialize terminal when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new XtermTerminal();
+        });
+    </script>
 </body>
 </html>
