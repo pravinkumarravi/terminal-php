@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Next-Gen Web Terminal</title>
+  
+  <!-- Local Fonts -->
+  <link rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/jetbrains-mono-500.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- xterm.js & Addons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-search@0.15.0/lib/addon-search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-canvas@0.7.0/lib/addon-canvas.min.js"></script>
+
+  <!-- File-Icons Theme (https://github.com/file-icons/vscode) -->
+  <link rel="stylesheet" href="css/file-icons.min.css">
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="css/terminal.css">
+</head>
+<body>
+
+  <!-- Top App Navigation & Tab Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-icon">⚡</span>
+      <span class="brand-text">WebTerm</span>
+      <span class="brand-badge">Next-Gen PTY</span>
+    </div>
+
+    <!-- Multi-tab Management -->
+    <div class="tabs-wrapper">
+      <div class="tabs-list" id="tabs-list"></div>
+      <div class="tab-add-group">
+        <button class="tab-add-btn" id="new-tab-btn" title="New Tab (Alt+T)">+</button>
+        <span class="tab-add-divider"></span>
+        <select class="shell-dropdown" id="new-tab-shell-select" title="Select Shell for New Tab">
+          <option value="default">Default Shell</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Header Actions (VS Code Codicons) -->
+    <div class="header-actions">
+      <!-- 1. Split Layout / Customize Layout -->
+      <button class="action-btn split-btn active" data-mode="none" title="Single Pane View (Alt+1)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M1.5 2h13l.5.5v11l-.5.5h-13l-.5-.5v-11l.5-.5zM2 3v10h5V3H2zm6 0v4.5h6V3H8zm6 5.5H8V13h6V8.5z"/>
+        </svg>
+      </button>
+
+      <!-- 2. Primary Side Bar (File Explorer) -->
+      <button class="action-btn" id="toggle-files-btn" title="Toggle Primary Side Bar (Files) (Alt+B)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.5L2.5 2h11l.5.5v11l-.5.5h-11l-.5-.5v-11zM3 3v10h3V3H3zm4 0v10h6V3H7z"/>
+        </svg>
+      </button>
+
+      <!-- 3. Bottom Panel (Split Horizontal) -->
+      <button class="action-btn split-btn" data-mode="horizontal" title="Toggle Panel (Split Bottom) (Alt+3)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.5L2.5 2h11l.5.5v11l-.5.5h-11l-.5-.5v-11zM3 3v6h10V3H3zm0 7v3h10v-3H3z"/>
+        </svg>
+      </button>
+
+      <!-- 4. Secondary Side Bar (Split Vertical) -->
+      <button class="action-btn split-btn" data-mode="vertical" title="Toggle Secondary Side Bar (Split Side-by-Side) (Alt+2)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.5L2.5 2h11l.5.5v11l-.5.5h-11l-.5-.5v-11zM3 3v10h6V3H3zm7 0v10h3V3h-3z"/>
+        </svg>
+      </button>
+
+      <!-- 5. Search / Find in Terminal -->
+      <button class="action-btn" id="toggle-search-btn" title="Find in Terminal (Ctrl+F)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M11.5 7a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zm-.82 4.74a6 6 0 1 1 1.06-1.06l3.65 3.65-.71.71-3.65-3.65z"/>
+        </svg>
+      </button>
+
+      <!-- Separator -->
+      <div class="header-separator"></div>
+
+      <!-- 6. Toggle Fullscreen / Window -->
+      <button class="action-btn" id="fullscreen-btn" title="Toggle Fullscreen (F11)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5L2 2h4v1H3v3H2V3l-.5-.5zm9-1h4l.5.5v4h-1V3h-3.5v-1.5zM2 10h1v3h3v1H2.5l-.5-.5v-3.5zm12 0h-1v3h-3v1h3.5l.5-.5v-3.5z"/>
+        </svg>
+      </button>
+
+      <!-- 7. Settings -->
+      <button class="action-btn" id="settings-btn" title="Terminal Settings">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M9.1 4.4L8.6 2H7.4l-.5 2.4-.7.3-2-1.3-.9.8 1.3 2-.2.7-2.5.5v1.2l2.5.5.3.8-1.4 1.9.8.8 2-1.4.8.3.4 2.5h1.2l.5-2.5.7-.3 2 1.3.8-.8-1.3-2 .3-.7 2.5-.5V7.4l-2.5-.5-.3-.7 1.3-2-.8-.8-2 1.3-.7-.3zM8 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+
+
+  <!-- Terminal Panes Container -->
+  <main class="main-content">
+    <div class="panes-container" id="panes-container"></div>
+
+    <!-- In-Terminal Search Bar (Ctrl+F) -->
+    <div class="search-bar" id="search-bar">
+      <input type="text" class="search-input" id="search-input" placeholder="Find in terminal (Enter to search)...">
+      <button class="search-action-btn" id="search-prev-btn" title="Previous (Shift+Enter)">▲</button>
+      <button class="search-action-btn" id="search-next-btn" title="Next (Enter)">▼</button>
+      <button class="search-action-btn" id="search-close-btn" title="Close">✕</button>
+    </div>
+  </main>
+
+  <!-- File Browser Drawer -->
+  <aside class="file-drawer" id="file-drawer">
+    <div class="drawer-header">
+      <span class="drawer-title">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.5L2.5 2h11l.5.5v11l-.5.5h-11l-.5-.5v-11zM3 3v10h3V3H3zm4 0v10h6V3H7z"/>
+        </svg>
+        File Explorer &amp; Transfer
+      </span>
+      <button class="btn-icon" id="file-drawer-close-btn" title="Close Explorer">✕</button>
+    </div>
+    <div class="drawer-path-bar" id="file-current-path">/</div>
+    <div class="file-list" id="file-list"></div>
+    <div class="drawer-footer">
+      <button class="btn-secondary" id="file-refresh-btn" style="flex:1">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M13.45 7.5A5.5 5.5 0 1 0 8 13.5v-1a4.5 4.5 0 1 1 4.45-5.5h-1.7l2.5 3 2.5-3h-2.3z"/>
+        </svg>
+        Refresh
+      </button>
+      <button class="btn-primary" id="file-upload-btn" style="flex:1">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M7.5 1.5l3.85 3.85-.71.71-2.14-2.14v7.79h-1V3.92L5.36 6.06l-.71-.71L8.5 1.5zM2.5 12.5h11v1h-11v-1z"/>
+        </svg>
+        Upload
+      </button>
+      <input type="file" id="file-upload-input" multiple style="display:none">
+    </div>
+  </aside>
+
+  <!-- Status Bar -->
+  <footer class="status-bar">
+    <div class="status-group">
+      <div class="status-item status-connecting" id="status-connection">
+        <span class="status-dot"></span>
+        <span class="status-text">Connecting...</span>
+      </div>
+      <div class="status-item">
+        <span>Latency:</span>
+        <span id="status-latency" style="color:var(--text-bright)">--ms</span>
+      </div>
+      <div class="status-item">
+        <span>Active Shell:</span>
+        <span id="status-shell" style="color:var(--accent-color)">Detecting...</span>
+      </div>
+    </div>
+
+    <div class="status-group">
+      <div class="status-item">
+        <span>Dimensions:</span>
+        <span id="status-dims" style="color:var(--text-bright)">-- × --</span>
+      </div>
+      <div class="status-item" id="status-mem">
+        <span>RAM: Loading...</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">⚙️ Terminal Settings</span>
+        <button class="modal-close-btn" id="settings-close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="setting-theme">Color Theme</label>
+          <select class="form-select" id="setting-theme">
+            <option value="tokyoNight">Tokyo Night (Default)</option>
+            <option value="catppuccinMocha">Catppuccin Mocha</option>
+            <option value="dracula">Dracula</option>
+            <option value="monokaiPro">Monokai Pro</option>
+            <option value="oneDark">One Dark Pro</option>
+            <option value="matrixCyber">Matrix Cyberpunk</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="setting-font">Font Family</label>
+          <select class="form-select" id="setting-font">
+            <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+            <option value="'Fira Code', monospace">Fira Code</option>
+            <option value="Consolas, monospace">Consolas</option>
+            <option value="Menlo, monospace">Menlo</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="setting-font-size">Font Size (px)</label>
+          <input type="number" class="form-input" id="setting-font-size" min="10" max="32" value="14">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="setting-cursor-style">Cursor Style</label>
+          <select class="form-select" id="setting-cursor-style">
+            <option value="block">Block █</option>
+            <option value="underline">Underline  </option>
+            <option value="bar">Bar |</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-checkbox-label">
+            <input type="checkbox" id="setting-cursor-blink" checked>
+            <span>Cursor Blinking</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-checkbox-label">
+            <input type="checkbox" id="setting-copy-select">
+            <span>Copy to clipboard on text selection</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="settings-save-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Editor Modal -->
+  <div class="modal-overlay" id="editor-modal">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <span class="modal-title" id="editor-file-path">Edit File</span>
+        <button class="modal-close-btn" id="editor-close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <textarea class="editor-textarea" id="editor-textarea" spellcheck="false"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="editor-save-btn">💾 Save File</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Modal -->
+  <div class="modal-overlay" id="auth-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">🔒 Terminal Authentication</span>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">
+          This terminal is password-protected. Please enter the master password to access the shell.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="auth-password-input">Password</label>
+          <input type="password" class="form-input" id="auth-password-input" placeholder="Enter password...">
+        </div>
+        <div id="auth-error-msg" style="color:var(--danger); font-size:13px; margin-top:6px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="auth-submit-btn">Unlock Terminal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/file-icons.min.js"></script>
+  <script>
+    if (typeof require === 'function') {
+      try {
+        window.FileIcons = require('file-icons-js');
+      } catch (e) {}
+    }
+  </script>
+  <script src="js/themes.js"></script>
+  <script src="js/terminal-tab.js"></script>
+  <script src="js/file-browser.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
